@@ -82,6 +82,25 @@ flowchart TD
 
 ---
 
+## 🌐 線上部署與 Supabase 雲端串接
+
+- **GitHub Pages 線上戰情室網址**：👉 [https://davidyeh51.github.io/solar-storage-lead-agent/](https://davidyeh51.github.io/solar-storage-lead-agent/)
+- **GitHub 專案倉庫**：👉 [https://github.com/davidyeh51/solar-storage-lead-agent](https://github.com/davidyeh51/solar-storage-lead-agent)
+
+### ⚡ Supabase BaaS 雲端資料庫串接指南
+本專案採用 **GitHub Pages ✕ Supabase BaaS** 現代無伺服器架構，支援免後端純靜態雙向同步：
+1. **執行 SQL 結構腳本**：
+   - 登入 [Supabase Dashboard](https://supabase.com/dashboard/project/cowljafosekwvxithwjd/sql/new)
+   - 複製專案根目錄的 [`supabase-schema.sql`](./supabase-schema.sql) 貼入 SQL Editor 並執行
+   - 腳本將自動建立 `solar_leads`、`architects`、`early_radar` 資料表並強制啟用 **RLS (Row Level Security)** 行級安全防護
+2. **網頁介面即時連線**：
+   - 打開 [GitHub Pages 網站](https://davidyeh51.github.io/solar-storage-lead-agent/)
+   - 點擊頂部右上角的 **「Supabase 設定」** 狀態標籤（系統已自動預填您的專案連線資訊）
+   - 點擊 **「儲存並測試連線」**，狀態將轉為 **🟢 Supabase 雲端已連線**！
+   - 點擊 **「同步本機案場至雲端」** 即可一鍵雙向更新案場與建築師網絡！
+
+---
+
 ## 💻 四、 系統快速啟動方式
 
 ### 1. 安裝環境與相依套件
