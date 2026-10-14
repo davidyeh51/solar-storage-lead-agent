@@ -1,0 +1,518 @@
+[
+  {
+    "permit_no": "(115)屏科建字第001號",
+    "project_name": "宇晨材料科技屏東科學園區一期廠房新建工程",
+    "applicant": "宇晨材料科技股份有限公司",
+    "architect": "許銘陽建築師事務所",
+    "contractor": "達欣工程股份有限公司",
+    "use_category": "C-1 (特殊廠房/散熱材料)",
+    "structure": "鋼骨構造 (S)",
+    "location": "屏東縣屏東市屏東科學園區產一用地",
+    "site_area_m2": 18500.0,
+    "building_area_m2": 9250.0,
+    "floor_area_m2": 27750.0,
+    "contract_capacity_kw": 4500.0,
+    "date_issued": "2026-08-15",
+    "stage_code": "Stage2",
+    "stage_badge": "Stage 2: 建照核發 (黃金攔截期)",
+    "pipeline_status": "首訪進行中 (已邀約建築師)",
+    "pipeline_color": "blue",
+    "notes": "屏科首家動土建廠企業！主攻AI伺服器與半導體高導熱液態金屬材料，建照圖說剛定案，需立即由 Vanessa 協調結構光電排佈。",
+    "id": "lead_001",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 9250.0,
+        "building_area_ping": 2798.1,
+        "contract_capacity_kw": 4500.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": false,
+        "large_user_note": "未達5,000kW用電大戶門檻"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 6012.5,
+        "suggested_solar_kwp": 969.8,
+        "suggested_ess_kw": 242.4,
+        "suggested_ess_kwh": 484.8,
+        "annual_generation_kwh": 1260740.0,
+        "annual_co2_reduction_tons": 624.1,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 970 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 485 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 43641000.0,
+        "ess_capex_ntd": 12120000.0,
+        "total_capex_ntd": 55761000.0,
+        "annual_solar_revenue_ntd": 7312292.0,
+        "annual_ess_arbitrage_ntd": 575942.0,
+        "annual_ess_demand_saving_ntd": 468317.0,
+        "total_annual_benefit_ntd": 8356551.0,
+        "payback_years": 6.7,
+        "roi_20yr_irr_approx": 10.0
+      }
+    },
+    "assigned_rep": "Vanessa",
+    "battle_card": {
+      "assigned_rep": "Vanessa",
+      "rep_name": "Vanessa",
+      "rep_role": "前線先鋒業務 (S1新開發 / S2新園區)",
+      "rep_email": "vanessa@kingsun-energy.com.tw",
+      "routing_reason": "符合 S1/S2 重點拓客指標：坐落於南台灣高科技新興聚落（或契約容量 ≥ 5MW 用電大戶），屬高價值關鍵戰略客戶。",
+      "core_strategy": "主打「法規強制義務 100% 合規 + RE100 / CBAM 綠電憑證供應 + 尖離峰削峰填谷表後儲能」。",
+      "action_plan": [
+        "調閱設計人（建築師）與承造人清單，搶在建照掛件與都審前進行『免費圖說協作與結構載重簽證』拜訪",
+        "提供客製化《新廠綠電與儲能效益試算書》，換算年省電費與 20 年收益",
+        "拜訪廠務總監與 ESG 永續長，提供 RE100 自發自用合規路徑規劃"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  },
+  {
+    "permit_no": "(115)屏科建字第002號",
+    "project_name": "聚和國際屏東科學園區生技特化新廠新建工程",
+    "applicant": "聚和國際股份有限公司",
+    "architect": "潘冀聯合建築師事務所",
+    "contractor": "互助營造股份有限公司",
+    "use_category": "C-1 (特殊廠房/生技特化)",
+    "structure": "鋼骨鋼筋混凝土 (SRC)",
+    "location": "屏東縣屏東市屏東科學園區產二用地",
+    "site_area_m2": 32000.0,
+    "building_area_m2": 16000.0,
+    "floor_area_m2": 48000.0,
+    "contract_capacity_kw": 8000.0,
+    "date_issued": "2026-09-02",
+    "stage_code": "Stage2",
+    "stage_badge": "Stage 2: 建照核發 (黃金攔截期)",
+    "pipeline_status": "圖說協作中 (提供結構計算書)",
+    "pipeline_color": "emerald",
+    "notes": "全球生物緩衝劑龍頭，契約容量 8MW 屬用電大戶條款強烈約束對象！屋頂可設約 1,600 kWp 光電，並規劃 1.5MWh 表後儲能。",
+    "id": "lead_002",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 16000.0,
+        "building_area_ping": 4840.0,
+        "contract_capacity_kw": 8000.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": true,
+        "large_user_note": "符合「用電大戶條款」（契約容量 ≥ 5,000kW），法定綠能義務量約 800 kW"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 10400.0,
+        "suggested_solar_kwp": 1677.4,
+        "suggested_ess_kw": 800.0,
+        "suggested_ess_kwh": 1600.0,
+        "annual_generation_kwh": 2180620.0,
+        "annual_co2_reduction_tons": 1079.4,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 1,677 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 1,600 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 75483000.0,
+        "ess_capex_ntd": 40000000.0,
+        "total_capex_ntd": 115483000.0,
+        "annual_solar_revenue_ntd": 12647596.0,
+        "annual_ess_arbitrage_ntd": 1900800.0,
+        "annual_ess_demand_saving_ntd": 1545600.0,
+        "total_annual_benefit_ntd": 16093996.0,
+        "payback_years": 7.2,
+        "roi_20yr_irr_approx": 8.9
+      }
+    },
+    "assigned_rep": "Vanessa",
+    "battle_card": {
+      "assigned_rep": "Vanessa",
+      "rep_name": "Vanessa",
+      "rep_role": "前線先鋒業務 (S1新開發 / S2新園區)",
+      "rep_email": "vanessa@kingsun-energy.com.tw",
+      "routing_reason": "符合 S1/S2 重點拓客指標：坐落於南台灣高科技新興聚落（或契約容量 ≥ 5MW 用電大戶），屬高價值關鍵戰略客戶。",
+      "core_strategy": "主打「法規強制義務 100% 合規 + RE100 / CBAM 綠電憑證供應 + 尖離峰削峰填谷表後儲能」。",
+      "action_plan": [
+        "調閱設計人（建築師）與承造人清單，搶在建照掛件與都審前進行『免費圖說協作與結構載重簽證』拜訪",
+        "提供客製化《新廠綠電與儲能效益試算書》，換算年省電費與 20 年收益",
+        "拜訪廠務總監與 ESG 永續長，提供 RE100 自發自用合規路徑規劃"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  },
+  {
+    "permit_no": "(115)高市工建築字第03810號",
+    "project_name": "高雄白埔產業園區台積電先進封裝設備支援中心新建案",
+    "applicant": "帆宣系統科技股份有限公司",
+    "architect": "九典聯合建築師事務所",
+    "contractor": "漢唐集成股份有限公司",
+    "use_category": "C-1 (高科技廠務工程廠房)",
+    "structure": "鋼骨構造 (S)",
+    "location": "高雄市岡山區白埔產業園區專區C",
+    "site_area_m2": 26000.0,
+    "building_area_m2": 13000.0,
+    "floor_area_m2": 39000.0,
+    "contract_capacity_kw": 6500.0,
+    "date_issued": "2026-09-20",
+    "stage_code": "Stage2",
+    "stage_badge": "Stage 2: 建照核發 (黃金攔截期)",
+    "pipeline_status": "規格已送審 (綁定進金生方案)",
+    "pipeline_color": "purple",
+    "notes": "白埔園區旗艦供應鏈大廠，環評承諾屋頂光電覆蓋率達 50% 以上，Vanessa 與九典張建築師已完成 CAD 圖說繪製。",
+    "id": "lead_003",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 13000.0,
+        "building_area_ping": 3932.5,
+        "contract_capacity_kw": 6500.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": true,
+        "large_user_note": "符合「用電大戶條款」（契約容量 ≥ 5,000kW），法定綠能義務量約 650 kW"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 8450.0,
+        "suggested_solar_kwp": 1362.9,
+        "suggested_ess_kw": 650.0,
+        "suggested_ess_kwh": 1300.0,
+        "annual_generation_kwh": 1771770.0,
+        "annual_co2_reduction_tons": 877.0,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 1,363 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 1,300 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 61330500.0,
+        "ess_capex_ntd": 32500000.0,
+        "total_capex_ntd": 93830500.0,
+        "annual_solar_revenue_ntd": 10276266.0,
+        "annual_ess_arbitrage_ntd": 1544400.0,
+        "annual_ess_demand_saving_ntd": 1255800.0,
+        "total_annual_benefit_ntd": 13076466.0,
+        "payback_years": 7.2,
+        "roi_20yr_irr_approx": 8.9
+      }
+    },
+    "assigned_rep": "Vanessa",
+    "battle_card": {
+      "assigned_rep": "Vanessa",
+      "rep_name": "Vanessa",
+      "rep_role": "前線先鋒業務 (S1新開發 / S2新園區)",
+      "rep_email": "vanessa@kingsun-energy.com.tw",
+      "routing_reason": "符合 S1/S2 重點拓客指標：坐落於南台灣高科技新興聚落（或契約容量 ≥ 5MW 用電大戶），屬高價值關鍵戰略客戶。",
+      "core_strategy": "主打「法規強制義務 100% 合規 + RE100 / CBAM 綠電憑證供應 + 尖離峰削峰填谷表後儲能」。",
+      "action_plan": [
+        "調閱設計人（建築師）與承造人清單，搶在建照掛件與都審前進行『免費圖說協作與結構載重簽證』拜訪",
+        "提供客製化《新廠綠電與儲能效益試算書》，換算年省電費與 20 年收益",
+        "拜訪廠務總監與 ESG 永續長，提供 RE100 自發自用合規路徑規劃"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  },
+  {
+    "permit_no": "(115)屏科審議字第035號",
+    "project_name": "南亞科技屏東科學園區3D晶圓封測新廠投資案",
+    "applicant": "南亞科技股份有限公司",
+    "architect": "潘冀聯合建築師事務所",
+    "contractor": "待發包 (工程籌備處)",
+    "use_category": "C-1 (半導體3D晶圓封測廠)",
+    "structure": "鋼骨鋼筋混凝土 (SRC)",
+    "location": "屏東縣屏東市屏東科學園區",
+    "site_area_m2": 55000.0,
+    "building_area_m2": 27500.0,
+    "floor_area_m2": 110000.0,
+    "contract_capacity_kw": 25000.0,
+    "date_issued": "2026-10-05 (審議通過)",
+    "stage_code": "Stage1",
+    "stage_badge": "Stage 1: 早期預警 (國科會審議通過)",
+    "pipeline_status": "早期接洽中 (拜訪籌備處)",
+    "pipeline_color": "amber",
+    "notes": "國科會第35次審議會核准之超級重量級投資案！距離掛建照還有 6~9 個月，為 2026~2027 最具戰略價值之光儲整合標的！",
+    "id": "lead_004",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 27500.0,
+        "building_area_ping": 8318.8,
+        "contract_capacity_kw": 25000.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": true,
+        "large_user_note": "符合「用電大戶條款」（契約容量 ≥ 5,000kW），法定綠能義務量約 2,500 kW"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 17875.0,
+        "suggested_solar_kwp": 2883.1,
+        "suggested_ess_kw": 2500.0,
+        "suggested_ess_kwh": 5000.0,
+        "annual_generation_kwh": 3748030.0,
+        "annual_co2_reduction_tons": 1855.3,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 2,883 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 5,000 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 129739500.0,
+        "ess_capex_ntd": 125000000.0,
+        "total_capex_ntd": 254739500.0,
+        "annual_solar_revenue_ntd": 21738574.0,
+        "annual_ess_arbitrage_ntd": 5940000.0,
+        "annual_ess_demand_saving_ntd": 4830000.0,
+        "total_annual_benefit_ntd": 32508574.0,
+        "payback_years": 7.8,
+        "roi_20yr_irr_approx": 7.8
+      }
+    },
+    "assigned_rep": "Vanessa",
+    "battle_card": {
+      "assigned_rep": "Vanessa",
+      "rep_name": "Vanessa",
+      "rep_role": "前線先鋒業務 (S1新開發 / S2新園區)",
+      "rep_email": "vanessa@kingsun-energy.com.tw",
+      "routing_reason": "符合 S1/S2 重點拓客指標：坐落於南台灣高科技新興聚落（或契約容量 ≥ 5MW 用電大戶），屬高價值關鍵戰略客戶。",
+      "core_strategy": "主打「法規強制義務 100% 合規 + RE100 / CBAM 綠電憑證供應 + 尖離峰削峰填谷表後儲能」。",
+      "action_plan": [
+        "調閱設計人（建築師）與承造人清單，搶在建照掛件與都審前進行『免費圖說協作與結構載重簽證』拜訪",
+        "提供客製化《新廠綠電與儲能效益試算書》，換算年省電費與 20 年收益",
+        "拜訪廠務總監與 ESG 永續長，提供 RE100 自發自用合規路徑規劃"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  },
+  {
+    "permit_no": "(115)南工建字第01988號",
+    "project_name": "高雄金屬精工老客戶二期智慧綠能廠房擴建案",
+    "applicant": "舜煜實業股份有限公司 (Key Account)",
+    "architect": "喻台生建築師事務所",
+    "contractor": "根基營造股份有限公司",
+    "use_category": "C-2 (一般金屬精密加工廠)",
+    "structure": "鋼骨構造 (S)",
+    "location": "台南市新市產業園區二期",
+    "site_area_m2": 14000.0,
+    "building_area_m2": 7000.0,
+    "floor_area_m2": 14000.0,
+    "contract_capacity_kw": 2200.0,
+    "date_issued": "2026-09-18",
+    "stage_code": "Stage2",
+    "stage_badge": "Stage 2: 建照核發 (擴建二期)",
+    "pipeline_status": "議價簽約中 (一期續約客戶)",
+    "pipeline_color": "emerald",
+    "notes": "Jane 負責之 S1 既有 Key Account 二期擴廠案，業主對一期發電收益極滿意，已指名二期光儲合約由進金生統包。",
+    "id": "lead_005",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 7000.0,
+        "building_area_ping": 2117.5,
+        "contract_capacity_kw": 2200.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": false,
+        "large_user_note": "未達5,000kW用電大戶門檻"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 4550.0,
+        "suggested_solar_kwp": 733.9,
+        "suggested_ess_kw": 183.5,
+        "suggested_ess_kwh": 367.0,
+        "annual_generation_kwh": 954070.0,
+        "annual_co2_reduction_tons": 472.3,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 734 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 367 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 33025500.0,
+        "ess_capex_ntd": 9175000.0,
+        "total_capex_ntd": 42200500.0,
+        "annual_solar_revenue_ntd": 5533606.0,
+        "annual_ess_arbitrage_ntd": 435996.0,
+        "annual_ess_demand_saving_ntd": 354522.0,
+        "total_annual_benefit_ntd": 6324124.0,
+        "payback_years": 6.7,
+        "roi_20yr_irr_approx": 10.0
+      }
+    },
+    "assigned_rep": "Jane",
+    "battle_card": {
+      "assigned_rep": "Jane",
+      "rep_name": "Jane",
+      "rep_role": "資深大客戶業務 (S1 Key Account 維護)",
+      "rep_email": "jane@kingsun-energy.com.tw",
+      "routing_reason": "符合 S1 Key Account 擴廠分群：業主為既有客戶之擴建或二期廠房，重疊回購轉化率最高。",
+      "core_strategy": "主打「既有服務升級、新舊廠發電綜合代管、既有光儲系統一鍵擴充、優先保留饋線配額」。",
+      "action_plan": [
+        "調閱該業主一期案場歷史發電數據與滿意度報告",
+        "於 3 日內主動致電原廠務窗口，提供二期新廠免費屋頂光電法規義務預檢",
+        "約訪總經理或總務處長，爭取不用比價直接議價統包"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  },
+  {
+    "permit_no": "(115)南科微電第008號",
+    "project_name": "國科會南科高雄園區智慧微電網示範標準廠房暨防救災儲能標案",
+    "applicant": "南部科學園區管理局 / 國科會",
+    "architect": "宗邁建築師事務所",
+    "contractor": "公開招標中 (公共工程標案)",
+    "use_category": "C-2 / 公共設施 (示範標準廠房)",
+    "structure": "鋼骨鋼筋混凝土 (SRC)",
+    "location": "高雄市路竹區南科高雄園區",
+    "site_area_m2": 20000.0,
+    "building_area_m2": 8000.0,
+    "floor_area_m2": 24000.0,
+    "contract_capacity_kw": 3000.0,
+    "date_issued": "2026-10-01",
+    "stage_code": "Stage3",
+    "stage_badge": "Stage 3: 公共標案招標 (發包期)",
+    "pipeline_status": "備標聯營中 (結合EMS夥伴)",
+    "pipeline_color": "cyan",
+    "notes": "Julia 負責之 S5 微電網旗艦標案，需建置 800kW 屋頂光電 + 1.2MWh 儲能 + EMS 區域微電網黑啟動功能。",
+    "id": "lead_006",
+    "roi_result": {
+      "inputs": {
+        "building_area_m2": 8000.0,
+        "building_area_ping": 2420.0,
+        "contract_capacity_kw": 3000.0,
+        "usable_roof_ratio": 0.65,
+        "annual_sun_hours": 1300.0,
+        "electricity_rate": 5.8
+      },
+      "regulations": {
+        "is_solar_mandatory": true,
+        "mandatory_note": "符合《再生能源發展條例》第12-1條（新建物屋頂光電強制設置義務）",
+        "is_large_user": false,
+        "large_user_note": "未達5,000kW用電大戶門檻"
+      },
+      "technical_specs": {
+        "usable_roof_m2": 5200.0,
+        "suggested_solar_kwp": 838.7,
+        "suggested_ess_kw": 209.7,
+        "suggested_ess_kwh": 419.4,
+        "annual_generation_kwh": 1090310.0,
+        "annual_co2_reduction_tons": 539.7,
+        "architect_notes": [
+          "屋頂載重預留：鋼構/SRC廠房建議預留 15~18 kg/m² 額外靜載重（含太陽能支架、雙面玻璃模組與走道維護通道）。",
+          "台電饋線預留：太陽能容量 839 kWp 需預留低壓 (380V) 或高壓 (11.4kV/22.8kV) 變壓器與逆變器 (Inverter) 機房空間。",
+          "儲能防護區劃：表後儲能 419 kWh 需獨立防火區劃，建議設置於地面層戶外或半戶外機房，符合 NFPA 855 及消防法規要求。",
+          "女兒牆與採光排煙罩：建照圖說需避開採光罩與排煙窗投影陰影區，確保光電無陰影遮蔽效益極大化。"
+        ]
+      },
+      "financial_roi": {
+        "solar_capex_ntd": 37741500.0,
+        "ess_capex_ntd": 10485000.0,
+        "total_capex_ntd": 48226500.0,
+        "annual_solar_revenue_ntd": 6323798.0,
+        "annual_ess_arbitrage_ntd": 498247.0,
+        "annual_ess_demand_saving_ntd": 405140.0,
+        "total_annual_benefit_ntd": 7227185.0,
+        "payback_years": 6.7,
+        "roi_20yr_irr_approx": 10.0
+      }
+    },
+    "assigned_rep": "Julia",
+    "battle_card": {
+      "assigned_rep": "Julia",
+      "rep_name": "Julia",
+      "rep_role": "專案與微電網業務 (S5 微電網與公共標案)",
+      "rep_email": "julia@kingsun-energy.com.tw",
+      "routing_reason": "符合 S5 微電網/公共標案分群：包含標準廠房、示範微電網或防救災韌性用電場域。",
+      "core_strategy": "以「高韌性微電網 (Microgrid) + EMS 智慧能源管理 + 夥伴儲能系統」切入，主打台電電網韌性與不斷電防災效益。",
+      "action_plan": [
+        "透過政府電子採購網追蹤招標規範與截標期限",
+        "邀約工研院/大專院校或 EMS 合作夥伴組成聯合計畫投標隊伍",
+        "向業主或招標單位進行『全台首座韌性微電網示範場域』簡報"
+      ],
+      "target_contacts": [
+        "建築師事務所（設計主持人 / 專案建築師）—— 爭取畫進建照圖說",
+        "業主廠務工程處處長 / 總務部經理 —— 決定機電與能源配置",
+        "業主永續長 (CSO) / 財務長 (CFO) —— 關心 RE100、減碳與投資回收期"
+      ],
+      "sales_pitch_highlights": [
+        "『我們在建築師畫圖階段提供免費 3D 光電排佈、結構載重安全係數試算與台電饋線併網預審，不增加建築師任何負擔！』",
+        "『新廠只要依法規規劃太陽光電與儲能，不僅能完全符合《再生能源發展條例》第12-1條，年化更可省下數百萬元高價尖峰電費！』",
+        "『進金生能源擁有逾 20 年光電儲能 EPC 實績，提供 20 年發電保證與原廠一級維運代管，讓新廠驗收使照一氣呵成！』"
+      ]
+    }
+  }
+]

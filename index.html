@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智馳光儲 · 早鳥預警拓客 AI 戰情室</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              gold: '#eab308',
+              cyan: '#06b6d4',
+              accent: '#38bdf8'
+            },
+            dark: {
+              bg: '#0b1120',
+              card: '#131e36',
+              border: '#1e293b',
+              hover: '#1e2d4d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase Client -->
+  <script src="./static/supabase-client.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="./static/style.css">
+</head>
+<body class="bg-[#0b1120] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <div id="app" class="flex-1 flex flex-col">
+    <!-- 頂部導航欄 (Top Navigation) -->
+    <header class="sticky top-0 z-40 bg-[#0f172a]/90 backdrop-blur-md border-b border-slate-800/80 px-6 py-3.5">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <i data-lucide="zap" class="w-6 h-6 text-slate-950 stroke-[2.5]"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                智馳光儲 <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold tracking-wide">早鳥預警拓客 AI 戰情室</span>
+              </h1>
+            </div>
+            <p class="text-xs text-slate-400">太陽光電 · 表後儲能 · 建照前6~18個月早期攔截系統</p>
+          </div>
+        </div>
+
+        <!-- 頂部操作按鈕 -->
+        <div class="flex items-center space-x-3">
+          <!-- Supabase 狀態指示 -->
+          <button @click="showSupabaseModal = true" class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer" :class="supabaseStatusClass">
+            <span class="w-2 h-2 rounded-full" :class="supabaseDotClass"></span>
+            <span>{{ supabaseStatusText }}</span>
+          </button>
+
+          <button @click="triggerCrawler" :disabled="isCrawling" class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition shadow-sm active:scale-95 disabled:opacity-50">
+            <i data-lucide="refresh-cw" :class="{'animate-spin': isCrawling}" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>{{ isCrawling ? '全網雷達掃描中...' : '即時雷達掃描' }}</span>
+          </button>
+          
+          <button @click="openBiweeklyReport" class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition active:scale-95">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>Lucy 雙週情報報表</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主頁籤導航 (Main Tabs Navigation) -->
+    <div class="border-b border-slate-800 bg-[#0f172a]/40 px-6">
+      <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto py-2 no-scrollbar">
+        <button 
+          v-for="tab in tabs" 
+          :key="tab.id"
+          @click="activeTab = tab.id"
+          :class="[
+            activeTab === tab.id 
+              ? 'bg-slate-800 text-emerald-400 border-slate-700 font-semibold shadow-sm' 
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent'
+          ]"
+          class="flex items-center space-x-2 px-4 py-2 rounded-lg text-xs border transition whitespace-nowrap"
+        >
+          <i :data-lucide="tab.icon" class="w-4 h-4"></i>
+          <span>{{ tab.name }}</span>
+          <span v-if="tab.badge" class="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">{{ tab.badge }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 主要內容區 (Tab Panels) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+      <!-- TAB 1: 戰情總覽儀表板 (Dashboard) -->
+      <section v-if="activeTab === 'dashboard'" class="space-y-6 animate-fadeIn">
+        <!-- 頂部核心 KPI 卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-5 rounded-2xl bg-gradient-to-br from-[#131e36] to-[#0f172a] border border-slate-800/80 shadow-lg relative overflow-hidden group">
+            <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:opacity-20 transition">
+              <i data-lucide="target" class="w-24 h-24 text-emerald-400"></i>
+            </div>
+            <div class="text-xs font-medium text-slate-400 flex items-center justify-between">
+              <span>追蹤重點案場</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">高轉化</span>
+            </div>
+            <div class="mt-2 flex items-baseline space-x-2">
+              <span class="text-3xl font-extrabold tracking-tight text-white">{{ summary.kpis?.total_leads_count || 0 }}</span>
+              <span class="text-xs text-slate-400">件</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="radar" class="w-3.5 h-3.5 text-cyan-400"></i>
+              早鳥情報庫累積 {{ summary.kpis?.early_radar_count || 0 }} 則即時快訊
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-gradient-to-br from-[#131e36] to-[#0f172a] border border-slate-800/80 shadow-lg relative overflow-hidden group">
+            <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:opacity-20 transition">
+              <i data-lucide="sun" class="w-24 h-24 text-amber-400"></i>
+            </div>
+            <div class="text-xs font-medium text-slate-400 flex items-center justify-between">
+              <span>潛在屋頂光電規模</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">法規義務</span>
+            </div>
+            <div class="mt-2 flex items-baseline space-x-2">
+              <span class="text-3xl font-extrabold tracking-tight text-amber-400">{{ summary.kpis?.total_solar_mw || 0 }}</span>
+              <span class="text-xs text-slate-400">MWp</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400">
+              符合《再生能源發展條例》強制門檻
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-gradient-to-br from-[#131e36] to-[#0f172a] border border-slate-800/80 shadow-lg relative overflow-hidden group">
+            <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:opacity-20 transition">
+              <i data-lucide="battery-charging" class="w-24 h-24 text-cyan-400"></i>
+            </div>
+            <div class="text-xs font-medium text-slate-400 flex items-center justify-between">
+              <span>潛在表後儲能規模</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">削峰填谷</span>
+            </div>
+            <div class="mt-2 flex items-baseline space-x-2">
+              <span class="text-3xl font-extrabold tracking-tight text-cyan-400">{{ summary.kpis?.total_ess_mwh || 0 }}</span>
+              <span class="text-xs text-slate-400">MWh</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400">
+              用電大戶條款 10% 義務對應配置
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-gradient-to-br from-[#131e36] to-[#0f172a] border border-slate-800/80 shadow-lg relative overflow-hidden group">
+            <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:opacity-20 transition">
+              <i data-lucide="badge-dollar-sign" class="w-24 h-24 text-emerald-400"></i>
+            </div>
+            <div class="text-xs font-medium text-slate-400 flex items-center justify-between">
+              <span>預估年化總效益</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">20年長約</span>
+            </div>
+            <div class="mt-2 flex items-baseline space-x-2">
+              <span class="text-3xl font-extrabold tracking-tight text-emerald-400">NT$ {{ summary.kpis?.total_annual_revenue_million_ntd || 0 }}</span>
+              <span class="text-xs text-slate-400">百萬/年</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400">
+              省電費 + 綠電轉供 + 尖離峰套利
+            </div>
+          </div>
+        </div>
+
+        <!-- 建廠生命週期漏斗與業務團隊分流 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- 生命週期漏斗 -->
+          <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800 shadow-md flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="git-commit" class="w-4 h-4 text-emerald-400"></i>
+                  建廠生命週期攔截漏斗
+                </h3>
+                <span class="text-[11px] text-slate-400">愈早切入勝率愈高</span>
+              </div>
+              <div class="space-y-3">
+                <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="font-medium text-amber-400">Stage 1: 早期預警 (環評 / 審議 / 購地)</span>
+                    <span class="font-bold text-white">{{ summary.stage_distribution?.Stage1 || 0 }} 案</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400">提前 6~18 個月 · 建築師剛開始畫圖，預留結構載重</div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="font-medium text-emerald-400">Stage 2: 中期精準 (都審 / 建照核發)</span>
+                    <span class="font-bold text-white">{{ summary.stage_distribution?.Stage2 || 0 }} 案</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400">動工前 1~3 個月 · 鎖定 C1/C2 建築師與統包綁定規格</div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="font-medium text-cyan-400">Stage 3: 施工發包 (廠務招標 / 動土)</span>
+                    <span class="font-bold text-white">{{ summary.stage_distribution?.Stage3 || 0 }} 案</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400">工程啟動 · 微電網公共標案與廠務統包聯營</div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 text-center">
+              💡 核心原則：切勿等建照核准才拜訪，必須在建築師畫圖時卡位！
+            </div>
+          </div>
+
+          <!-- 團隊 STP 排兵佈陣 -->
+          <div class="lg:col-span-2 p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800 shadow-md">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+                STP 業務排兵佈陣與派案進度
+              </h3>
+              <span class="text-xs text-slate-400">依客戶屬性精準分派</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <!-- Vanessa -->
+              <div @click="filterByRep('Vanessa')" class="p-3.5 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/60 cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">V</div>
+                    <div>
+                      <div class="text-xs font-bold text-white">Vanessa</div>
+                      <div class="text-[10px] text-slate-400">前線主力 (S1新客 / S2新園區)</div>
+                    </div>
+                  </div>
+                  <span class="text-base font-extrabold text-emerald-400 font-mono">{{ summary.rep_distribution?.Vanessa || 0 }} 案</span>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-300 line-clamp-2">鎖定屏科TSMC神鏈、白埔、橋科、用電≥5MW大戶。主攻法規光電+儲能削峰。</p>
+              </div>
+
+              <!-- Jane -->
+              <div @click="filterByRep('Jane')" class="p-3.5 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/60 cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">J</div>
+                    <div>
+                      <div class="text-xs font-bold text-white">Jane</div>
+                      <div class="text-[10px] text-slate-400">資深客戶 (S1 Key Account)</div>
+                    </div>
+                  </div>
+                  <span class="text-base font-extrabold text-amber-400 font-mono">{{ summary.rep_distribution?.Jane || 0 }} 案</span>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-300 line-clamp-2">專注既有 Key Account 二期擴廠、集團廠房續約與回購，轉化率最高。</p>
+              </div>
+
+              <!-- Julia -->
+              <div @click="filterByRep('Julia')" class="p-3.5 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/60 cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">Ju</div>
+                    <div>
+                      <div class="text-xs font-bold text-white">Julia</div>
+                      <div class="text-[10px] text-slate-400">標案專案 (S5 微電網/公共)</div>
+                    </div>
+                  </div>
+                  <span class="text-base font-extrabold text-cyan-400 font-mono">{{ summary.rep_distribution?.Julia || 0 }} 案</span>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-300 line-clamp-2">公辦標準廠房、校園大樓與防救災儲能標案，搭配 EMS 與儲能夥伴。</p>
+              </div>
+
+              <!-- Lucy -->
+              <div @click="filterByRep('Lucy')" class="p-3.5 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/60 cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">L</div>
+                    <div>
+                      <div class="text-xs font-bold text-white">Lucy</div>
+                      <div class="text-[10px] text-slate-400">行銷主管 (名單初篩/雙週報)</div>
+                    </div>
+                  </div>
+                  <span class="text-base font-extrabold text-purple-400 font-mono">{{ summary.rep_distribution?.Lucy || 0 }} 案</span>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-300 line-clamp-2">雙週情報報表產出、全網快訊初篩培育、重大專案派案稽核。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 焦點案場快速列表 -->
+        <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800 shadow-md">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+                南台灣重點高價值攔截案場 (南科 / 屏科 / 白埔)
+              </h3>
+              <p class="text-xs text-slate-400">已自動計算光儲容量與業務作戰卡</p>
+            </div>
+            <button @click="activeTab = 'leads'" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+              查看全部 {{ leads.length }} 案 <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div 
+              v-for="lead in leads.slice(0, 3)" 
+              :key="lead.id" 
+              class="p-4 rounded-xl bg-slate-800/50 border border-slate-700/70 hover:border-emerald-500/50 transition cursor-pointer flex flex-col justify-between"
+              @click="selectLead(lead)"
+            >
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{ lead.stage_badge }}</span>
+                  <span class="text-slate-400 font-mono text-[11px]">{{ lead.assigned_rep }} 負責</span>
+                </div>
+                <h4 class="text-sm font-bold text-white line-clamp-1">{{ lead.applicant }}</h4>
+                <p class="text-xs text-slate-300 mt-1 line-clamp-1">{{ lead.project_name }}</p>
+                <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                  <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                    <span class="text-slate-400 block text-[10px]">屋頂光電</span>
+                    <span class="font-bold text-amber-400 text-xs">{{ lead.roi_result?.technical_specs?.suggested_solar_kwp || 0 }} kWp</span>
+                  </div>
+                  <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                    <span class="text-slate-400 block text-[10px]">表後儲能</span>
+                    <span class="font-bold text-cyan-400 text-xs">{{ lead.roi_result?.technical_specs?.suggested_ess_kwh || 0 }} kWh</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3 pt-2.5 border-t border-slate-700/50 flex justify-between items-center text-[11px] text-slate-400">
+                <span class="truncate">建築師：{{ lead.architect }}</span>
+                <span class="text-emerald-400 font-medium">查看作戰卡 →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 2: 早鳥預警情報雷達 (Early-Bird Radar) -->
+      <section v-if="activeTab === 'radar'" class="space-y-6 animate-fadeIn">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="radio" class="w-5 h-5 text-cyan-400 animate-pulse"></i>
+              實時早鳥預警情報雷達 (Live Radar Feed)
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">監控環評書件、三大科學園區審議名單、土地標售與上市櫃買地建廠重大訊息（建照前 6~18 個月）</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <select v-model="radarFilterCategory" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+              <option value="ALL">全部情報管道 ({{ radarItems.length }})</option>
+              <option value="Stage1_Park">南台灣新興園區動態</option>
+              <option value="Stage1_EIA">環境部環評書件查詢</option>
+              <option value="Stage1_MOPS">上市櫃重大訊息 (買地建廠)</option>
+              <option value="Stage2_Permit">C類建照與工廠核發</option>
+              <option value="Stage3_Tender">微電網與儲能標案</option>
+            </select>
+            <button @click="triggerCrawler" :disabled="isCrawling" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5">
+              <i data-lucide="refresh-cw" :class="{'animate-spin': isCrawling}" class="w-3.5 h-3.5"></i>
+              重新掃描
+            </button>
+          </div>
+        </div>
+
+        <!-- 情報卡片清單 -->
+        <div class="space-y-3">
+          <div 
+            v-for="item in filteredRadarItems" 
+            :key="item.id"
+            class="p-4 rounded-xl bg-[#131e36]/80 border border-slate-800 hover:border-slate-700 transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+          >
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-2 text-xs mb-1.5">
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                  {{ item.category_name }}
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                  {{ item.stage_badge }}
+                </span>
+                <span class="text-slate-400 text-[11px]">{{ item.source }} · {{ item.published }}</span>
+              </div>
+              <h3 class="text-sm font-bold text-white hover:text-cyan-300 transition">
+                <a :href="item.link" target="_blank" rel="noopener noreferrer" class="hover:underline flex items-center gap-1.5">
+                  {{ item.title }}
+                  <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
+                </a>
+              </h3>
+              
+              <!-- 萃取實體標籤 (園區 / 企業) -->
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <span v-for="p in item.detected_parks" :key="p" class="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
+                  📍 {{ p }}
+                </span>
+                <span v-for="c in item.detected_companies" :key="c" class="px-2 py-0.5 rounded bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20 font-medium">
+                  🏢 {{ c }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 操作：一鍵轉為正式商機線索 -->
+            <div class="flex items-center space-x-2">
+              <button 
+                @click="convertRadarToLead(item)"
+                class="px-3.5 py-2 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>轉為追蹤案場</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="filteredRadarItems.length === 0" class="text-center py-12 text-slate-500 text-xs">
+            目前無符合該類別之雷達情報，請點擊「重新掃描」抓取最新動態。
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 3: 建照精準鎖定庫 (Building Permit Leads) -->
+      <section v-if="activeTab === 'leads'" class="space-y-6 animate-fadeIn">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="building-2" class="w-5 h-5 text-emerald-400"></i>
+              建照精準鎖定商機庫 (Building Permit Leads)
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">篩選 C-1 / C-2 工業廠房、構造 S/SRC/RC、基地面積>3,000m²、建築面積>1,000m²</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- 搜尋框 -->
+            <div class="relative">
+              <input 
+                v-model="leadsSearchQuery" 
+                type="text" 
+                placeholder="搜尋業主、建築師、園區..."
+                class="pl-8 pr-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-52"
+              >
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+            </div>
+
+            <!-- 業務篩選 -->
+            <select v-model="leadsFilterRep" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+              <option value="ALL">全部業務</option>
+              <option value="Vanessa">Vanessa (新園區/大戶)</option>
+              <option value="Jane">Jane (既有KA擴廠)</option>
+              <option value="Julia">Julia (微電網/公共)</option>
+              <option value="Lucy">Lucy (名單培育)</option>
+            </select>
+
+            <button @click="showAddLeadModal = true" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              新增案場
+            </button>
+          </div>
+        </div>
+
+        <!-- 案場清單卡片 -->
+        <div class="grid grid-cols-1 gap-4">
+          <div 
+            v-for="lead in filteredLeads" 
+            :key="lead.id"
+            class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 hover:border-slate-700 transition"
+          >
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+              <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono">
+                    {{ lead.permit_no }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                    {{ lead.use_category }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                    {{ lead.structure }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    {{ lead.stage_badge }}
+                  </span>
+                </div>
+                <h3 class="text-base font-bold text-white">{{ lead.applicant }}</h3>
+                <p class="text-xs text-slate-400 mt-0.5">【{{ lead.project_name }}】· 📍 {{ lead.location }}</p>
+              </div>
+
+              <!-- 右側操作與負責人 -->
+              <div class="flex items-center space-x-3">
+                <div class="text-right">
+                  <div class="text-xs font-semibold text-white flex items-center gap-1.5 justify-end">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    {{ lead.assigned_rep }}
+                  </div>
+                  <div class="text-[10px] text-slate-400">{{ lead.pipeline_status }}</div>
+                </div>
+
+                <button 
+                  @click="openStrategyModal(lead)" 
+                  class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
+                >
+                  <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+                  <span>AI 業務作戰卡</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 數據指標列 (光電容量、儲能容量、財務效益、建築師) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-xs">
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                <span class="text-slate-400 block text-[10px]">屋頂法規光電</span>
+                <span class="text-sm font-bold text-amber-400 font-mono">{{ lead.roi_result?.technical_specs?.suggested_solar_kwp || 0 }} kWp</span>
+                <span class="text-[10px] text-slate-500 block">建坪 {{ lead.roi_result?.inputs?.building_area_ping || 0 }} 坪</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                <span class="text-slate-400 block text-[10px]">表後儲能配置</span>
+                <span class="text-sm font-bold text-cyan-400 font-mono">{{ lead.roi_result?.technical_specs?.suggested_ess_kwh || 0 }} kWh</span>
+                <span class="text-[10px] text-slate-500 block">契約 {{ lead.contract_capacity_kw || 0 }} kW</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                <span class="text-slate-400 block text-[10px]">預估年化總效益</span>
+                <span class="text-sm font-bold text-emerald-400 font-mono">NT$ {{ (lead.roi_result?.financial_roi?.total_annual_benefit_ntd || 0).toLocaleString() }}</span>
+                <span class="text-[10px] text-slate-500 block">回收期約 {{ lead.roi_result?.financial_roi?.payback_years || 0 }} 年</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                <span class="text-slate-400 block text-[10px]">設計建築師 / 營造廠</span>
+                <span class="text-xs font-bold text-slate-200 block truncate">{{ lead.architect }}</span>
+                <span class="text-[10px] text-slate-500 block truncate">{{ lead.contractor }}</span>
+              </div>
+            </div>
+
+            <!-- 作戰策略預覽 -->
+            <div class="mt-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 text-xs text-slate-300 flex items-start gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5"></i>
+              <div>
+                <span class="font-semibold text-white">作戰戰術：</span>
+                {{ lead.battle_card?.core_strategy }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 4: 建築師與營造廠網絡 (Architect Network) -->
+      <section v-if="activeTab === 'architects'" class="space-y-6 animate-fadeIn">
+        <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="compass" class="w-5 h-5 text-cyan-400"></i>
+            高頻率工業廠房建築師白名單庫 (Architect Strategic Network)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">「改變攻擊節點 —— 從找業主提前到綁定建築師與廠務統包」：在建照掛件與都審前提供免費圖說與載重預留協作！</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div 
+            v-for="arch in architects" 
+            :key="arch.id"
+            class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition"
+          >
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-cyan-400 font-mono">{{ arch.c_class_frequency }}</span>
+                <span :class="getStatusBadgeClass(arch.cooperation_color)" class="px-2 py-0.5 rounded text-[10px] font-semibold border">
+                  {{ arch.cooperation_status }}
+                </span>
+              </div>
+              <h3 class="text-base font-bold text-white">{{ arch.name }}</h3>
+              <p class="text-xs text-slate-400">{{ arch.principal }} · 📍 {{ arch.location }}</p>
+
+              <div class="mt-3 space-y-2 text-xs">
+                <div>
+                  <span class="text-slate-400 block text-[10px]">專精領域</span>
+                  <span class="text-slate-200">{{ arch.specialty }}</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[10px]">代表建案</span>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <span v-for="p in arch.representative_projects" :key="p" class="px-1.5 py-0.5 bg-slate-800 rounded text-[10px] text-slate-300">
+                      {{ p }}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[10px]">常配廠務營造</span>
+                  <span class="text-slate-300 font-medium">{{ arch.partner_epc.join(', ') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800">
+              <p class="text-[11px] text-slate-300 italic mb-3">"{{ arch.collaboration_notes }}"</p>
+              <div class="flex justify-between items-center">
+                <button 
+                  @click="updateArchStatus(arch)" 
+                  class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition active:scale-95"
+                >
+                  更新合作進度
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 5: 法規義務與光儲 ROI 試算器 (Calculator) -->
+      <section v-if="activeTab === 'calculator'" class="space-y-6 animate-fadeIn">
+        <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="calculator" class="w-5 h-5 text-amber-400"></i>
+            《再生能源發展條例》第12-1條與光儲 ROI 專業試算器
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">即時試算建築面積義務屋頂光電容量、表後儲能建議、年發電效益與投資回收期</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- 左側輸入控制面板 -->
+          <div class="lg:col-span-5 p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 space-y-4">
+            <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-2">建案基本規格輸入</h3>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">建築面積 (m²)</label>
+              <div class="flex items-center space-x-2">
+                <input v-model.number="calcInputs.building_area_m2" @input="recalc" type="number" step="100" class="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-mono">
+                <span class="text-xs text-slate-400 font-mono">{{ (calcInputs.building_area_m2 * 0.3025).toFixed(0) }} 坪</span>
+              </div>
+              <p class="text-[10px] text-amber-400/90 mt-1">※ 達 1,000 m² (約300坪) 強制依比例設置太陽光電</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">預估用電契約容量 (kW)</label>
+              <input v-model.number="calcInputs.contract_capacity_kw" @input="recalc" type="number" step="100" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-mono">
+              <p class="text-[10px] text-cyan-400/90 mt-1">※ 達 5,000 kW (5MW) 適用用電大戶條款 (義務量 10%)</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">屋頂可用比例 ({{ (calcInputs.usable_roof_ratio * 100).toFixed(0) }}%)</label>
+              <input v-model.number="calcInputs.usable_roof_ratio" @input="recalc" type="range" min="0.3" max="0.9" step="0.05" class="w-full accent-amber-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">自發自用 / 綠電轉供替代電價 (NT$ / 度)</label>
+              <input v-model.number="calcInputs.electricity_rate" @input="recalc" type="number" step="0.1" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-mono">
+            </div>
+
+            <div class="pt-3 border-t border-slate-800">
+              <span class="text-xs font-semibold text-slate-400 block mb-2">法規合規狀態檢查</span>
+              <div class="space-y-2 text-xs">
+                <div class="p-2.5 rounded-lg bg-slate-900 border" :class="calcResult.regulations?.is_solar_mandatory ? 'border-emerald-500/40 text-emerald-300' : 'border-slate-800 text-slate-400'">
+                  {{ calcResult.regulations?.mandatory_note }}
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900 border" :class="calcResult.regulations?.is_large_user ? 'border-cyan-500/40 text-cyan-300' : 'border-slate-800 text-slate-400'">
+                  {{ calcResult.regulations?.large_user_note }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右側計算成果與財務報表 -->
+          <div class="lg:col-span-7 space-y-4">
+            <!-- 推薦配置卡片 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/30">
+                <span class="text-xs text-amber-400 font-semibold block">建議屋頂光電設置容量</span>
+                <span class="text-3xl font-extrabold text-white font-mono mt-1 block">{{ calcResult.technical_specs?.suggested_solar_kwp || 0 }} <span class="text-base text-amber-400 font-normal">kWp</span></span>
+                <span class="text-[11px] text-slate-400 mt-1 block">年發電量約 {{ (calcResult.technical_specs?.annual_generation_kwh || 0).toLocaleString() }} 度</span>
+              </div>
+
+              <div class="p-5 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/30">
+                <span class="text-xs text-cyan-400 font-semibold block">建議表後儲能配置</span>
+                <span class="text-3xl font-extrabold text-white font-mono mt-1 block">{{ calcResult.technical_specs?.suggested_ess_kwh || 0 }} <span class="text-base text-cyan-400 font-normal">kWh</span></span>
+                <span class="text-[11px] text-slate-400 mt-1 block">功率 {{ calcResult.technical_specs?.suggested_ess_kw || 0 }} kW (2小時放電)</span>
+              </div>
+            </div>
+
+            <!-- 財務投資與回收表 -->
+            <div class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 space-y-3">
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider">財務投資與回收效益預估</h4>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block text-[10px]">預估總投資 (CAPEX)</span>
+                  <span class="text-sm font-bold text-white font-mono">NT$ {{ ((calcResult.financial_roi?.total_capex_ntd || 0)/10000).toLocaleString() }} 萬</span>
+                </div>
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block text-[10px]">年化總收益 (電費/套利)</span>
+                  <span class="text-sm font-bold text-emerald-400 font-mono">NT$ {{ ((calcResult.financial_roi?.total_annual_benefit_ntd || 0)/10000).toLocaleString() }} 萬</span>
+                </div>
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block text-[10px]">簡單投資回收期</span>
+                  <span class="text-sm font-bold text-cyan-400 font-mono">{{ calcResult.financial_roi?.payback_years || 0 }} 年</span>
+                </div>
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block text-[10px]">年度減碳效益</span>
+                  <span class="text-sm font-bold text-emerald-400 font-mono">{{ calcResult.technical_specs?.annual_co2_reduction_tons || 0 }} 噸CO2e</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 給建築師與結構工程師的圖說技術指引 -->
+            <div class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800">
+              <h4 class="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-2.5">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                建築師建照圖說技術指引 (圖說協作必備項目)
+              </h4>
+              <ul class="space-y-2 text-xs text-slate-300">
+                <li v-for="(note, idx) in calcResult.technical_specs?.architect_notes" :key="idx" class="flex items-start gap-2">
+                  <span class="text-emerald-400 font-bold">✔</span>
+                  <span>{{ note }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 6: 建照存根一鍵文字解析器 (Permit Parser) -->
+      <section v-if="activeTab === 'parser'" class="space-y-6 animate-fadeIn">
+        <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="file-input" class="w-5 h-5 text-emerald-400"></i>
+            建照存根快速貼上解析器 (Smart Permit Parser)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">從各縣市工務局建管處或南科管理局複製執照存根文字，AI 自動解析起造人、建築師、面積，並即時試算法規光電義務容量與派案！</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 文字輸入框 -->
+          <div class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 flex flex-col justify-between space-y-4">
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <label class="text-xs font-semibold text-slate-300">貼上建照存根或文字內容</label>
+                <button @click="fillSamplePermit" class="text-xs text-cyan-400 hover:text-cyan-300">填入示範範本</button>
+              </div>
+              <textarea 
+                v-model="rawPermitText" 
+                rows="12" 
+                placeholder="例如：執照號碼：(115)高市工建築字第05820號&#10;起造人：聯發科技股份有限公司&#10;設計人：潘冀聯合建築師事務所&#10;承造人：達欣工程股份有限公司&#10;使用類組：C-1 (特殊廠房)&#10;構造：鋼骨構造 (S)&#10;建築面積：15,000 平方公尺..." 
+                class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+              ></textarea>
+            </div>
+            
+            <button 
+              @click="parsePermitText" 
+              class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition active:scale-95 flex items-center justify-center gap-2"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              智慧解析並自動結算法規 ROI
+            </button>
+          </div>
+
+          <!-- 解析結果預覽 -->
+          <div class="p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 space-y-4">
+            <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-2">解析與派案結果</h3>
+            
+            <div v-if="parsedResult" class="space-y-3 text-xs">
+              <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                <span class="text-emerald-400 font-bold block">{{ parsedResult.project_name }}</span>
+                <div class="text-slate-300">起造人：{{ parsedResult.applicant }}</div>
+                <div class="text-slate-300">建築師：{{ parsedResult.architect }}</div>
+                <div class="text-slate-300">使用類組：{{ parsedResult.use_category }} ({{ parsedResult.structure }})</div>
+                <div class="text-slate-300">建築面積：{{ parsedResult.building_area_m2 }} m² ({{ (parsedResult.building_area_m2 * 0.3025).toFixed(0) }} 坪)</div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold">
+                  光電義務：{{ parsedResult.roi_result?.technical_specs?.suggested_solar_kwp }} kWp
+                </div>
+                <div class="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-semibold">
+                  建議儲能：{{ parsedResult.roi_result?.technical_specs?.suggested_ess_kwh }} kWh
+                </div>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 space-y-1">
+                <div class="flex justify-between font-semibold text-white">
+                  <span>分派負責業務：{{ parsedResult.assigned_rep }}</span>
+                  <span class="text-emerald-400">{{ parsedResult.battle_card?.rep_role }}</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">{{ parsedResult.battle_card?.routing_reason }}</p>
+              </div>
+
+              <button 
+                @click="saveParsedLead" 
+                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition active:scale-95"
+              >
+                確認儲存至追蹤商機庫
+              </button>
+            </div>
+
+            <div v-else class="text-center py-16 text-slate-500 text-xs">
+              在左側貼上建照文字後點擊解析，AI 將即時提取欄位並產出專屬作戰卡。
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- TAB 7: AI 業務智囊助理 (AI Strategy Consultant) -->
+      <section v-if="activeTab === 'ai_consult'" class="space-y-6 animate-fadeIn">
+        <div class="p-5 rounded-2xl bg-[#131e36]/70 border border-slate-800">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="bot" class="w-5 h-5 text-emerald-400"></i>
+            AI 業務智囊助理 (Solar & Storage AI Sales Strategist)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">針對屏東科學園區、白埔產業園區、高頻建築師合作話術、法規條款或任一案場進行深度對策諮詢</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- 快速問題按鈕 -->
+          <div class="lg:col-span-4 p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">熱門業務作戰題庫</h3>
+            <div class="space-y-2">
+              <button 
+                v-for="(q, idx) in promptPresets" 
+                :key="idx" 
+                @click="askAi(q)"
+                class="w-full p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-left text-xs text-slate-300 hover:text-white transition"
+              >
+                💬 {{ q }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 對話歷史與回答 -->
+          <div class="lg:col-span-8 p-5 rounded-2xl bg-[#131e36]/80 border border-slate-800 flex flex-col h-[540px]">
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2" id="chatContainer">
+              <div v-for="(msg, i) in chatMessages" :key="i" class="flex flex-col space-y-1">
+                <div :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+                  <span class="text-[10px] text-slate-500">{{ msg.role === 'user' ? '業務提問' : 'AI 戰情顧問' }} · {{ msg.time }}</span>
+                  <div 
+                    :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-auto' : 'bg-slate-900 border border-slate-800 text-slate-200'"
+                    class="p-4 rounded-2xl text-xs max-w-xl whitespace-pre-line leading-relaxed shadow-sm mt-1"
+                  >
+                    {{ msg.content }}
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="isAiThinking" class="text-left">
+                <span class="text-[10px] text-slate-500">AI 思考中...</span>
+                <div class="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-slate-400 flex items-center gap-2 max-w-xs mt-1">
+                  <i data-lucide="loader" class="w-4 h-4 text-emerald-400 animate-spin"></i>
+                  正在檢索法規與園區情報庫...
+                </div>
+              </div>
+            </div>
+
+            <!-- 輸入框 -->
+            <div class="mt-4 pt-3 border-t border-slate-800 flex items-center space-x-2">
+              <input 
+                v-model="aiInputText" 
+                @keyup.enter="sendAiQuery" 
+                type="text" 
+                placeholder="詢問任何光儲法規、建築師攻防話術、屏科/白埔進駐策略..."
+                class="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              >
+              <button 
+                @click="sendAiQuery" 
+                :disabled="!aiInputText.trim() || isAiThinking"
+                class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                發送
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部版權 -->
+    <footer class="border-t border-slate-800/80 bg-[#0f172a]/60 py-4 px-6 text-center text-xs text-slate-500">
+      智馳光儲 · 早鳥預警拓客 AI Agent 系統 · 專為太陽光電與儲能新廠早期攔截量身打造
+    </footer>
+
+    <!-- MODAL 1: Lucy 雙週情報報表 Modal -->
+    <div v-if="showBiweeklyModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-[#131e36] border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-scaleUp">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="file-text" class="w-5 h-5 text-emerald-400"></i>
+            <h3 class="text-sm font-bold text-white">新園區與新建照潛在客戶雙週報 (Lucy 統籌)</h3>
+          </div>
+          <button @click="showBiweeklyModal = false" class="text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed bg-slate-950/60 rounded-xl m-4 border border-slate-800">
+          {{ biweeklyReportText }}
+        </div>
+        <div class="p-4 border-t border-slate-800 flex justify-end space-x-3">
+          <button @click="copyReportText" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+            {{ copySuccess ? '已複製到剪貼簿！' : '複製 Markdown' }}
+          </button>
+          <button @click="showBiweeklyModal = false" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: AI 業務作戰卡詳細檢視 Modal -->
+    <div v-if="showStrategyModal && currentStrategyLead" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-[#131e36] border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-scaleUp">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                負責業務：{{ currentStrategyLead.assigned_rep }}
+              </span>
+              <h3 class="text-sm font-bold text-white">{{ currentStrategyLead.project_name }}</h3>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">業主：{{ currentStrategyLead.applicant }} ｜ 建築師：{{ currentStrategyLead.architect }}</p>
+          </div>
+          <button @click="showStrategyModal = false" class="text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+          <!-- 戰情摘要 -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-bold text-amber-400 block mb-1">C-Level 董總級效益摘要</span>
+            <p class="text-slate-300 leading-relaxed">{{ currentStrategyReport?.c_level_summary }}</p>
+          </div>
+
+          <!-- 建築師協作策略 -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-bold text-cyan-400 block mb-1">建築師事務所協作話術 ({{ currentStrategyReport?.architect_strategy?.target }})</span>
+            <p class="text-slate-300 italic mb-2">"{{ currentStrategyReport?.architect_strategy?.core_message }}"</p>
+            <span class="text-[11px] text-slate-400 block mb-1">進金生提供之圖說支援：</span>
+            <ul class="list-disc list-inside text-slate-300 space-y-1">
+              <li v-for="(item, i) in currentStrategyReport?.architect_strategy?.deliverables_offered" :key="i">
+                {{ item }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- 業主廠務攻防話術 -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-bold text-emerald-400 block mb-1">業主廠務與 ESG 對話痛點拆解</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+              <div class="space-y-1 text-slate-400">
+                <span class="font-semibold text-red-400 block">業主潛在痛點：</span>
+                <p v-for="(p, i) in currentStrategyReport?.owner_pitch?.key_pain_points" :key="i" class="text-[11px]">
+                  • {{ p }}
+                </p>
+              </div>
+              <div class="space-y-1 text-slate-300">
+                <span class="font-semibold text-emerald-400 block">進金生破解對策：</span>
+                <p v-for="(c, i) in currentStrategyReport?.owner_pitch?.counter_measures" :key="i" class="text-[11px]">
+                  ✔ {{ c }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 作戰時程 CheckList -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-bold text-white block mb-2">業務前線作戰 CheckList (D+1 ~ D+14)</span>
+            <div class="space-y-2">
+              <div v-for="(chk, i) in currentStrategyReport?.checklist" :key="i" class="flex items-start gap-2.5 text-slate-300">
+                <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">{{ chk.step }}</span>
+                <span>{{ chk.action }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 flex justify-end">
+          <button @click="showStrategyModal = false" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: Supabase 雲端資料庫設定與同步 Modal -->
+    <div v-if="showSupabaseModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-[#131e36] border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-scaleUp">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full" :class="supabaseDotClass"></span>
+            <h3 class="text-sm font-bold text-white">Supabase 雲端資料庫 (PostgreSQL BaaS) 串接設定</h3>
+          </div>
+          <button @click="showSupabaseModal = false" class="text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+          <!-- 連線狀態說明 -->
+          <div class="p-3.5 rounded-xl border" :class="supabaseIsConnected ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'">
+            <div class="font-bold flex items-center gap-1.5">
+              <i :data-lucide="supabaseIsConnected ? 'check-circle' : 'alert-circle'" class="w-4 h-4"></i>
+              <span>{{ supabaseStatusMessage }}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">本系統遵循 github-supabase-web 規範：僅在前端公開 anon public key，後端強制啟用 RLS 行級安全，零私鑰外洩風險。</p>
+          </div>
+
+          <!-- 設定輸入區 -->
+          <div class="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Supabase Project URL</label>
+              <input v-model="supabaseUrlInput" type="text" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Supabase Anon Public Key (公開客戶端金鑰)</label>
+              <textarea v-model="supabaseKeyInput" rows="2" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div class="flex justify-between items-center pt-2">
+              <button @click="testAndSaveSupabase" :disabled="supabaseTesting" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5">
+                <i data-lucide="refresh-cw" :class="{'animate-spin': supabaseTesting}" class="w-3.5 h-3.5"></i>
+                <span>儲存並測試連線</span>
+              </button>
+
+              <button @click="syncLocalToCloud" :disabled="!supabaseIsConnected" class="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition active:scale-95 disabled:opacity-40 flex items-center gap-1.5">
+                <i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i>
+                <span>同步本機案場至雲端</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SQL Schema 快速複製與引導 -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-slate-200">一鍵建置 PostgreSQL 資料表與 RLS 權限</span>
+              <a href="https://supabase.com/dashboard/project/cowljafosekwvxithwjd/sql/new" target="_blank" class="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-[11px] underline">
+                開啟 Supabase SQL Editor <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+            <p class="text-[11px] text-slate-400">若尚未建立 `solar_leads`、`architects` 資料表，請複製專案目錄下的 `supabase-schema.sql` 全文並在 Supabase SQL Editor 執行：</p>
+            <div class="flex items-center space-x-2">
+              <input type="text" readonly value="supabase-schema.sql" class="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-400 font-mono text-[11px]">
+              <button @click="copySqlSchema" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold border border-slate-700 transition">
+                {{ sqlCopied ? '已複製！' : '複製 SQL' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 flex justify-end">
+          <button @click="showSupabaseModal = false" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./static/app.js"></script>
+</body>
+</html>
