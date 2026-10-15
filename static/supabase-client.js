@@ -1,6 +1,7 @@
 /**
- * 智馳光儲 · Supabase 雲端資料庫整合客戶端 (Supabase Client Module)
+ * 進能服南區業務部 · Supabase 雲端資料庫整合客戶端 (Supabase Client Module)
  * 符合 github-supabase-web 規範：僅暴露 anon public key，支援本機離線與雲端雙軌同步
+ * 支援 solar_leads、architects、early_radar 三大資料表之即時讀寫與批次同步
  */
 
 const DEFAULT_SUPABASE_URL = "https://cowljafosekwvxithwjd.supabase.co";
@@ -68,7 +69,8 @@ class SupabaseManager {
 
   // 取得雲端案場
   async getLeads() {
-    if (!this.client || !this.tableReady) return null;
+    if (!this.client) this.init();
+    if (!this.client) return null;
     try {
       const { data, error } = await this.client
         .from('solar_leads')
@@ -84,7 +86,8 @@ class SupabaseManager {
 
   // 同步新案場至雲端
   async upsertLead(lead) {
-    if (!this.client || !this.tableReady) return false;
+    if (!this.client) this.init();
+    if (!this.client) return false;
     try {
       const record = {
         id: lead.id,
@@ -124,7 +127,8 @@ class SupabaseManager {
 
   // 取得建築師名單
   async getArchitects() {
-    if (!this.client || !this.tableReady) return null;
+    if (!this.client) this.init();
+    if (!this.client) return null;
     try {
       const { data, error } = await this.client
         .from('architects')
@@ -139,7 +143,8 @@ class SupabaseManager {
 
   // 更新建築師狀態
   async updateArchitect(archId, updates) {
-    if (!this.client || !this.tableReady) return false;
+    if (!this.client) this.init();
+    if (!this.client) return false;
     try {
       const { error } = await this.client
         .from('architects')
@@ -152,6 +157,90 @@ class SupabaseManager {
       return true;
     } catch (e) {
       console.warn('[Supabase] updateArchitect error:', e);
+      return false;
+    }
+  }
+
+  // 取得實時早鳥雷達快訊 (早鳥情報庫)
+  async getRadar(limit = 100) {
+    if (!this.client) this.init();
+    if (!this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('early_radar')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn('[Supabase] getRadar error:', e);
+      return null;
+    }
+  }
+
+  // 單筆新增或更新實時雷達情報 (用於手動貼入新聞或單筆新訊)
+  async upsertRadar(item) {
+    if (!this.client) this.init();
+    if (!this.client) return false;
+    try {
+      const record = {
+        id: item.id || `radar_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        title: item.title,
+        full_title: item.full_title || item.title,
+        source: item.source || '業務手動貼入情報',
+        link: item.link || '',
+        published: item.published || new Date().toISOString().replace('T', ' ').substring(0, 16),
+        category_id: item.category_id || 'Stage1_Park',
+        category_name: item.category_name || '南台灣新興園區動態',
+        detected_parks: item.detected_parks || [],
+        detected_companies: item.detected_companies || [],
+        stage: item.stage || 'Stage 1: 早期預警',
+        stage_code: item.stage_code || 'Stage1',
+        stage_badge: item.stage_badge || 'Stage 1: 早期預警',
+        value_rating: item.value_rating || 'HIGH',
+        fetched_at: item.fetched_at || new Date().toISOString()
+      };
+      const { error } = await this.client
+        .from('early_radar')
+        .upsert(record, { onConflict: 'id' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] upsertRadar error:', e);
+      return false;
+    }
+  }
+
+  // 批次寫入實時雷達快訊 (主管點擊「即時雷達掃描」時同步多筆情報)
+  async batchUpsertRadar(items) {
+    if (!this.client) this.init();
+    if (!this.client || !items || items.length === 0) return false;
+    try {
+      const records = items.map(item => ({
+        id: item.id || `radar_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
+        title: item.title,
+        full_title: item.full_title || item.title,
+        source: item.source || '即時雷達掃描',
+        link: item.link || '',
+        published: item.published || new Date().toISOString().replace('T', ' ').substring(0, 16),
+        category_id: item.category_id || 'Stage1_Park',
+        category_name: item.category_name || '早期商機快訊',
+        detected_parks: item.detected_parks || [],
+        detected_companies: item.detected_companies || [],
+        stage: item.stage || 'Stage 1: 早期預警',
+        stage_code: item.stage_code || 'Stage1',
+        stage_badge: item.stage_badge || 'Stage 1: 早期預警',
+        value_rating: item.value_rating || 'HIGH',
+        fetched_at: item.fetched_at || new Date().toISOString()
+      }));
+      const { error } = await this.client
+        .from('early_radar')
+        .upsert(records, { onConflict: 'id' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] batchUpsertRadar error:', e);
       return false;
     }
   }

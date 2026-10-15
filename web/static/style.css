@@ -1,13 +1,40 @@
-/* 智馳光儲 · 現代深色戰情室樣式 */
+/* 進能服南區業務部 · 麥肯錫經典藍白高階戰情室樣式 (McKinsey Corporate Style) */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --mckinsey-navy: #051C2C;
+  --mckinsey-deep: #002244;
+  --mckinsey-blue: #005A9C;
+  --mckinsey-accent: #0072CE;
+  --mckinsey-light: #EBF3FA;
+  --mckinsey-canvas: #F4F7FB;
+  --mckinsey-card: #FFFFFF;
+  --mckinsey-border: #E2E8F0;
+  --mckinsey-text-primary: #0F172A;
+  --mckinsey-text-secondary: #475569;
+}
 
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  background-color: #0b1120;
+  background-color: var(--mckinsey-canvas);
+  color: var(--mckinsey-text-primary);
 }
 
 code, .font-mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* 麥肯錫高階卡片精緻陰影 */
+.mckinsey-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0, 26, 156, 0.04), 0 2px 4px -1px rgba(0, 26, 156, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mckinsey-card:hover {
+  box-shadow: 0 8px 16px -2px rgba(5, 28, 44, 0.06), 0 4px 6px -2px rgba(5, 28, 44, 0.03);
+  border-color: #CBD5E1;
 }
 
 /* 隱藏滾動條但保持滾動 */
@@ -19,14 +46,6 @@ code, .font-mono {
   scrollbar-width: none;
 }
 
-/* 漸變與陰影特效 */
-.glass-panel {
-  background: rgba(19, 30, 54, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 /* 動畫定義 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -34,7 +53,7 @@ code, .font-mono {
 }
 
 @keyframes scaleUp {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
 
@@ -46,18 +65,18 @@ code, .font-mono {
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* 滾動條美化 */
+/* 精緻滾動條美化 (淺色高雅風格) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.6);
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.9);
+  background: #94A3B8;
 }

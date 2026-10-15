@@ -1,5 +1,5 @@
 -- ==============================================================================
--- 智馳光儲 · 早鳥預警拓客 AI 戰情室 (Solar & Storage Early-Bird Lead Platform)
+-- 進能服南區業務部 · 早鳥預警拓客 AI 戰情室 (Solar & Storage Early-Bird Lead Platform)
 -- Supabase PostgreSQL 資料庫結構定義、RLS 行級安全政策與種子資料
 -- ==============================================================================
 
@@ -105,6 +105,10 @@ CREATE POLICY "Allow anon update architects" ON public.architects
 DROP POLICY IF EXISTS "Allow anon insert early_radar" ON public.early_radar;
 CREATE POLICY "Allow anon insert early_radar" ON public.early_radar
     FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon update early_radar" ON public.early_radar;
+CREATE POLICY "Allow anon update early_radar" ON public.early_radar
+    FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- 📊 寫入南台灣重點案場與建築師網絡種子資料

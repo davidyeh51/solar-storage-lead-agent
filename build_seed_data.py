@@ -49,7 +49,7 @@ summary = {
     "radar_updated_at": "即時同步 (2026-10-14)"
 }
 
-js_content = f"""// 智馳光儲 · 預載展示種子資料 (GitHub Pages 純靜態模式專用)
+js_content = f"""// 進能服南區業務部 · 預載展示種子資料 (GitHub Pages 純靜態模式專用)
 window.SEED_SUMMARY = {json.dumps(summary, ensure_ascii=False, indent=2)};
 window.SEED_LEADS = {json.dumps(leads, ensure_ascii=False, indent=2)};
 window.SEED_RADAR = {json.dumps(radar_items, ensure_ascii=False, indent=2)};

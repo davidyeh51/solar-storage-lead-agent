@@ -1,4 +1,4 @@
-# ☀️ 智馳光儲 · 早鳥預警拓客 AI 戰情室 (Solar & Storage Early-Bird Lead Intelligence Platform)
+# ☀️ 進能服南區業務部 · 早鳥預警拓客 AI 戰情室 (Solar & Storage Early-Bird Lead Intelligence Platform)
 
 專為**太陽光電（Solar PV）及表後儲能（BTM ESS）開發業者**打造的企業級業務開發 AI Agent 與視覺化戰情管理系統。
 

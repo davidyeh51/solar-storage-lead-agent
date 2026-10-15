@@ -1,5 +1,5 @@
 """
-智馳光儲·早鳥預警開發 AI Agent 後端 API 服務器 (FastAPI Server)
+進能服南區業務部·早鳥預警開發 AI Agent 後端 API 服務器 (FastAPI Server)
 整合即時爬蟲、建照智慧解析、法規ROI試算、建築師白名單、STP派案與AI戰情顧問。
 """
 
@@ -24,7 +24,7 @@ from agent.lead_router import LeadRouter
 from agent.ai_agent import SalesStrategyAgent
 
 app = FastAPI(
-    title="智馳光儲·早鳥預警拓客 AI 戰情室",
+    title="進能服南區業務部·早鳥預警拓客 AI 戰情室",
     description="太陽能光電與表後儲能早期開發情報雷達與業務 AI Agent",
     version="2.0.0"
 )
@@ -189,8 +189,19 @@ def refresh_radar():
     return {
         "status": "success",
         "fetched_count": len(items),
+        "items": items,
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+
+@app.post("/api/radar/add")
+def add_custom_radar_item(item: Dict[str, Any]):
+    """手動速貼新聞情報入庫"""
+    radar_info = collector.get_latest_cached_radar()
+    items = radar_info.get("items", [])
+    item["id"] = item.get("id") or f"radar_custom_{int(time.time()*1000)}"
+    items.insert(0, item)
+    collector.save_cache(items)
+    return {"status": "success", "item": item, "total_count": len(items)}
 
 @app.post("/api/radar/convert")
 def convert_radar_item(item_data: Dict[str, Any]):
@@ -304,7 +315,7 @@ def export_biweekly():
     radar = collector.get_latest_cached_radar()
     now_str = datetime.now().strftime("%Y年%m月%d日")
 
-    report_md = f"""# ☀️ 智馳光儲 · 新園區與新建照潛在客戶雙週報
+    report_md = f"""# ☀️ 進能服南區業務部 · 新園區與新建照潛在客戶雙週報
 **發布日期**：{now_str}  
 **統籌主管**：Lucy（行銷主管 / 情報樞紐）  
 **目標市場**：台南、高雄、屏東高用電工業大戶 (S1) 與新興園區擴建 (S2)

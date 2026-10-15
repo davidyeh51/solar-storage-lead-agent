@@ -1,4 +1,4 @@
-// 智馳光儲 · 預載展示種子資料 (GitHub Pages 純靜態模式專用)
+// 進能服南區業務部 · 預載展示種子資料 (GitHub Pages 純靜態模式專用)
 window.SEED_SUMMARY = {
   "kpis": {
     "total_leads_count": 6,
