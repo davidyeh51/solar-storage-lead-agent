@@ -50,8 +50,16 @@ createApp({
     const leadsFilterRep = ref('ALL');
     const radarFilterCategory = ref('ALL');
 
-    // 手動新聞貼入與即時雷達狀態 (Requirement 1)
-    const showNewsInputBox = ref(false);
+    // 多通道情報入庫狀態 (URL 網址抓取 / 檔案上傳 / 文字速貼)
+    const showNewsInputBox = ref(true); // 預設展開方便業務一鍵輸入
+    const intakeMode = ref('url'); // 'url' | 'file' | 'text'
+    const newsUrlInput = ref('https://ec.ltn.com.tw/article/breakingnews/5607046'); // 預設帶入用戶指定之自由財經日月光新聞
+    const isFetchingUrl = ref(false);
+    const isDragging = ref(false);
+    const isParsingFile = ref(false);
+    const uploadedFileName = ref('');
+    const uploadedFileContent = ref('');
+    const fileInputRef = ref(null);
     const isParsingNews = ref(false);
     const newsForm = reactive({
       title: '',
@@ -253,8 +261,185 @@ createApp({
     };
 
     // =========================================================================
-    // 📰 Requirement 1: 手動新聞速貼解析入庫 (Quick News Intake & AI Parsing)
+    // 📰 多通道情報入庫 (新聞網址抓取 · 文件檔案解析 · 文本速貼)
     // =========================================================================
+
+    const fillSampleUrl = (type) => {
+      if (type === 'ase') {
+        newsUrlInput.value = 'https://ec.ltn.com.tw/article/breakingnews/5607046';
+      } else if (type === 'baipu') {
+        newsUrlInput.value = 'https://money.udn.com/money/story/5612/8204910';
+      } else if (type === 'pingtung') {
+        newsUrlInput.value = 'https://ec.ltn.com.tw/article/breakingnews/4812390';
+      }
+      showNewsInputBox.value = true;
+    };
+
+    const triggerFileInput = () => {
+      if (fileInputRef.value) {
+        fileInputRef.value.click();
+      }
+    };
+
+    const handleFileSelect = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        await processFile(file);
+      }
+    };
+
+    const handleFileDrop = async (e) => {
+      isDragging.value = false;
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) {
+        await processFile(file);
+      }
+    };
+
+    const processFile = async (file) => {
+      try {
+        uploadedFileName.value = file.name;
+        const nameLower = file.name.toLowerCase();
+
+        if (nameLower.endsWith('.pdf')) {
+          if (!window.pdfjsLib) {
+            throw new Error('PDF.js 解析庫尚未完成載入，請稍候重試');
+          }
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdf = await loadingTask.promise;
+          let fullText = '';
+          const maxPages = Math.min(pdf.numPages, 30);
+          for (let i = 1; i <= maxPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullText += `--- Page ${i} ---\n` + pageText + '\n\n';
+          }
+          uploadedFileContent.value = fullText.trim();
+        } else {
+          // 純文字、Markdown、CSV 等
+          const text = await file.text();
+          uploadedFileContent.value = text.trim();
+        }
+
+        refreshIcons();
+      } catch (err) {
+        console.error('File parsing error:', err);
+        alert('檔案讀取解析失敗：' + err.message);
+      }
+    };
+
+    const parseUploadedFile = async () => {
+      if (!uploadedFileContent.value) {
+        alert('尚未成功讀取檔案內容！');
+        return;
+      }
+      isParsingFile.value = true;
+      try {
+        const title = uploadedFileName.value.replace(/\.[^/.]+$/, "");
+        await runAiExtractionAndSave({
+          title: `【檔案情資】${title}`,
+          content: uploadedFileContent.value,
+          source: `文件解析 (${uploadedFileName.value})`,
+          link: '#'
+        });
+        uploadedFileName.value = '';
+        uploadedFileContent.value = '';
+      } finally {
+        isParsingFile.value = false;
+        refreshIcons();
+      }
+    };
+
+    const fetchAndParseUrl = async () => {
+      const url = newsUrlInput.value.trim();
+      if (!url) {
+        alert('請輸入新聞或公告網址！');
+        return;
+      }
+
+      isFetchingUrl.value = true;
+      let rawText = '';
+      let articleTitle = '';
+      let sourceName = '網路情資';
+
+      // 判斷來源媒體名稱
+      if (url.includes('ltn.com.tw')) sourceName = '自由財經';
+      else if (url.includes('udn.com')) sourceName = '經濟日報';
+      else if (url.includes('chinatimes.com')) sourceName = '工商時報';
+      else if (url.includes('cna.com.tw')) sourceName = '中央社';
+      else if (url.includes('bip.gov.tw')) sourceName = '經濟部產業園區管理局';
+      else if (url.includes('moenv.gov.tw')) sourceName = '環境部環評書件論壇';
+      else if (url.includes('mops.twse.com.tw')) sourceName = '公開資訊觀測站(MOPS)';
+      else {
+        try {
+          sourceName = new URL(url).hostname;
+        } catch (e) {
+          sourceName = '新聞情報源';
+        }
+      }
+
+      try {
+        // 1. 優先嘗試 Jina Reader API (https://r.jina.ai/<url>)
+        try {
+          const jinaUrl = 'https://r.jina.ai/' + url;
+          const res = await fetch(jinaUrl, {
+            headers: { 'Accept': 'text/plain' }
+          });
+          if (res.ok) {
+            rawText = await res.text();
+            // 從 Jina 產出的 Markdown 萃取 Title
+            const titleMatch = rawText.match(/^Title:\s*(.+)$/m) || rawText.match(/^#\s*(.+)$/m);
+            if (titleMatch) {
+              articleTitle = titleMatch[1].replace(/ - .*$/, '').trim();
+            }
+          }
+        } catch (jinaErr) {
+          console.warn('Jina reader request failed, fallback to backend proxy:', jinaErr);
+        }
+
+        // 2. 若 Jina 無法讀取或為空，Fallback 至本地 FastAPI /api/fetch_url
+        if (!rawText || rawText.trim().length < 50) {
+          try {
+            const proxyRes = await fetch(`/api/fetch_url?url=${encodeURIComponent(url)}`);
+            if (proxyRes.ok) {
+              const pData = await proxyRes.json();
+              rawText = pData.content || '';
+              if (!articleTitle) articleTitle = pData.title || '';
+            }
+          } catch (proxyErr) {
+            console.warn('Backend proxy fetch failed:', proxyErr);
+          }
+        }
+
+        // 若依然抓不到，提示用戶
+        if (!rawText || rawText.trim().length < 20) {
+          throw new Error('無法自動從該網址抓取足夠內文（可能受反爬蟲或驗證碼限制），請切換至「貼入全文/手動編輯」直接貼上新聞內文！');
+        }
+
+        // 若無標題，使用前 35 字元
+        if (!articleTitle) {
+          const firstLine = rawText.split('\n').find(l => l.trim().length > 5) || '重大產業新案情報';
+          articleTitle = firstLine.substring(0, 45);
+        }
+
+        // 執行 AI 萃取並寫入早鳥雷達與 Supabase
+        await runAiExtractionAndSave({
+          title: articleTitle,
+          content: rawText,
+          source: sourceName,
+          link: url
+        });
+
+      } catch (err) {
+        console.error('Fetch and parse url error:', err);
+        alert(err.message);
+      } finally {
+        isFetchingUrl.value = false;
+        refreshIcons();
+      }
+    };
 
     const fillSampleNews = (type) => {
       if (type === 'baipu') {
@@ -277,113 +462,32 @@ createApp({
     };
 
     const parseAndAddNewsToRadar = async () => {
+      // 智慧容錯：若內文為空但填寫了網址，自動轉為網址抓取模式
+      if (!newsForm.content.trim() && newsForm.url.trim()) {
+        newsUrlInput.value = newsForm.url.trim();
+        await fetchAndParseUrl();
+        newsForm.url = '';
+        return;
+      }
+
       if (!newsForm.content.trim()) {
         alert('請輸入新聞內文或公告內容！');
         return;
       }
       isParsingNews.value = true;
       try {
-        const text = newsForm.content;
-        let title = newsForm.title.trim();
-        if (!title) {
-          const lines = text.split('\n').filter(l => l.trim().length > 0);
-          title = lines[0].length > 40 ? lines[0].substring(0, 40) + '...' : lines[0];
-        }
-        const source = newsForm.source.trim() || '進能服業務手動情報入庫';
-        const url = newsForm.url.trim() || '#';
-
-        // 實體識別：園區與公司
-        const detectedParks = [];
-        const parkKeywords = ['屏東科學園區', '白埔產業園區', '橋頭科學園區', '南科三期', '台南科工區', '路竹園區', '楠梓產業園區', '仁武產業園區', '和發產業園區', '新市產業園區', '岡山', '新市', '屏東', '南科', '竹科', '中科'];
-        parkKeywords.forEach(p => {
-          if (text.includes(p) && !detectedParks.includes(p)) detectedParks.push(p);
+        await runAiExtractionAndSave({
+          title: newsForm.title,
+          content: newsForm.content,
+          source: newsForm.source,
+          link: newsForm.url
         });
 
-        const detectedCompanies = [];
-        const compKeywords = ['宇晨材料', '聚和國際', '帆宣', '華懋', '和淞', '兆聯', '南亞科', '台積電', '聯發科', '日月光', '鴻海', '穩懋', '國巨', '華邦電', '群創', '友達', '長春石化', '台塑'];
-        compKeywords.forEach(c => {
-          if (text.includes(c) && !detectedCompanies.includes(c)) detectedCompanies.push(c);
-        });
-
-        // 生命週期階段識別
-        let stageCode = 'Stage1';
-        let stageBadge = 'Stage 1: 早期預警';
-        let categoryId = 'Stage1_Park';
-        let categoryName = '南台灣新興園區動態';
-
-        if (text.includes('環評') || text.includes('環境部') || text.includes('說明會')) {
-          stageCode = 'Stage1';
-          stageBadge = 'Stage 1: 環評書件承諾期 (建照前12~18個月)';
-          categoryId = 'Stage1_EIA';
-          categoryName = '環境部環評書件查詢';
-        } else if (text.includes('購地') || text.includes('標售') || text.includes('自地委建') || text.includes('重大訊息') || text.includes('取得不動產')) {
-          stageCode = 'Stage1';
-          stageBadge = 'Stage 1: 園區招商與購地 (建照前6~12個月)';
-          categoryId = 'Stage1_MOPS';
-          categoryName = '上市櫃重大訊息 (買地建廠)';
-        } else if (text.includes('審議會') || text.includes('核准進駐') || text.includes('核准投資')) {
-          stageCode = 'Stage1';
-          stageBadge = 'Stage 1: 國科會審議通過 (建照前6~9個月)';
-          categoryId = 'Stage1_Park';
-          categoryName = '國科會科學園區審議名單';
-        } else if (text.includes('建造執照') || text.includes('建照') || text.includes('都審')) {
-          stageCode = 'Stage2';
-          stageBadge = 'Stage 2: 建照掛件/都審 (黃金攔截期)';
-          categoryId = 'Stage2_Permit';
-          categoryName = '建照執照掛件與都審';
-        } else if (text.includes('動土') || text.includes('動工') || text.includes('發包') || text.includes('標案')) {
-          stageCode = 'Stage3';
-          stageBadge = 'Stage 3: 廠務發包與動土';
-          categoryId = 'Stage3_Tender';
-          categoryName = '廠務統包與標案發包';
-        }
-
-        const isHighValue = text.includes('台積電') || text.includes('半導體') || text.includes('50億') || text.includes('大戶') || text.includes('屏科');
-        const valueRating = isHighValue ? 'A+' : 'A';
-
-        const newItem = {
-          id: `radar_custom_${Date.now()}`,
-          title: title,
-          full_title: title,
-          source: source,
-          link: url,
-          published: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          category_id: categoryId,
-          category_name: categoryName,
-          detected_parks: detectedParks.length > 0 ? detectedParks : ['南台灣高科技園區'],
-          detected_companies: detectedCompanies.length > 0 ? detectedCompanies : ['早鳥進駐企業'],
-          stage: stageBadge,
-          stage_code: stageCode,
-          stage_badge: stageBadge,
-          value_rating: valueRating,
-          fetched_at: new Date().toISOString()
-        };
-
-        // 1. 動態插入至雷達清單頂部
-        radarItems.value.unshift(newItem);
-
-        // 2. 本地持久化 (localStorage)
-        const customList = JSON.parse(localStorage.getItem('CUSTOM_RADAR_ITEMS') || '[]');
-        customList.unshift(newItem);
-        localStorage.setItem('CUSTOM_RADAR_ITEMS', JSON.stringify(customList.slice(0, 50)));
-
-        // 3. 🌟 主動寫入 Supabase early_radar 資料表
-        let sbSynced = false;
-        if (window.supabaseManager) {
-          sbSynced = await window.supabaseManager.upsertRadar(newItem);
-        }
-
-        // 4. 重算 Summary
-        calculateLocalSummary();
-
-        // 清空表單並關閉面板
+        // 清空表單
         newsForm.title = '';
         newsForm.source = '';
         newsForm.content = '';
         newsForm.url = '';
-        showNewsInputBox.value = false;
-
-        alert(`🎉 新聞情報已成功解析並加入實時早鳥雷達！\n\n【情報標題】：${title}\n【預警階段】：${stageBadge}\n【識別實體】：${newItem.detected_companies.join(', ')} / ${newItem.detected_parks.join(', ')}\n\n${sbSynced ? '🟢 已即時同步寫入 Supabase 雲端資料庫 (early_radar)！' : '🟡 本地已更新，點擊「即時雷達掃描」可再次同步至 Supabase。'}`);
       } catch (err) {
         console.error('Error parsing news:', err);
         alert('解析新聞時發生異常：' + err.message);
@@ -391,6 +495,117 @@ createApp({
         isParsingNews.value = false;
         refreshIcons();
       }
+    };
+
+    const runAiExtractionAndSave = async ({ title, content, source, link, published }) => {
+      const text = content;
+      let finalTitle = (title || '').trim();
+      if (!finalTitle) {
+        const lines = text.split('\n').filter(l => l.trim().length > 0);
+        finalTitle = lines[0].length > 40 ? lines[0].substring(0, 40) + '...' : lines[0];
+      }
+      const finalSource = source || '進能服業務情報入庫';
+      const finalUrl = link || '#';
+
+      // 實體識別：園區與公司
+      const detectedParks = [];
+      const parkKeywords = [
+        '屏東科學園區', '屏東科技產業園區', '屏科', '白埔產業園區', '白埔', '橋頭科學園區', '橋科', 
+        '南科三期', '台南科工區', '路竹園區', '楠梓產業園區', '仁武產業園區', '和發產業園區', '新市產業園區', 
+        '岡山', '新市', '屏東', '南科', '竹科', '中科'
+      ];
+      parkKeywords.forEach(p => {
+        if (text.includes(p) && !detectedParks.includes(p)) detectedParks.push(p);
+      });
+
+      const detectedCompanies = [];
+      const compKeywords = [
+        '日月光', '日月光投控', '宇晨材料', '聚和國際', '帆宣', '華懋', '和淞', '兆聯', '安葆', '矽科宏晟', 
+        '南亞科', '台積電', '聯發科', '鴻海', '穩懋', '國巨', '華邦電', '群創', '友達', '長春石化', '台塑'
+      ];
+      compKeywords.forEach(c => {
+        if (text.includes(c) && !detectedCompanies.includes(c)) detectedCompanies.push(c);
+      });
+
+      // 生命週期階段識別
+      let stageCode = 'Stage1';
+      let stageBadge = 'Stage 1: 早期預警';
+      let categoryId = 'Stage1_Park';
+      let categoryName = '南台灣新興園區動態';
+
+      if (text.includes('實勘') || text.includes('現勘') || text.includes('覓地') || text.includes('招商') || text.includes('進駐')) {
+        stageCode = 'Stage1';
+        stageBadge = 'Stage 1: 實勘覓地與招商 (建照前12~18個月)';
+        categoryId = 'Stage1_Park';
+        categoryName = '南台灣新興園區實勘與動態';
+      } else if (text.includes('環評') || text.includes('環境部') || text.includes('說明會')) {
+        stageCode = 'Stage1';
+        stageBadge = 'Stage 1: 環評書件承諾期 (建照前12~18個月)';
+        categoryId = 'Stage1_EIA';
+        categoryName = '環境部環評書件查詢';
+      } else if (text.includes('購地') || text.includes('標售') || text.includes('自地委建') || text.includes('重大訊息') || text.includes('取得不動產')) {
+        stageCode = 'Stage1';
+        stageBadge = 'Stage 1: 園區招商與購地 (建照前6~12個月)';
+        categoryId = 'Stage1_MOPS';
+        categoryName = '上市櫃重大訊息 (買地建廠)';
+      } else if (text.includes('審議會') || text.includes('核准進駐') || text.includes('核准投資')) {
+        stageCode = 'Stage1';
+        stageBadge = 'Stage 1: 國科會審議通過 (建照前6~9個月)';
+        categoryId = 'Stage1_Park';
+        categoryName = '國科會科學園區審議名單';
+      } else if (text.includes('建造執照') || text.includes('建照') || text.includes('都審') || text.includes('都市設計')) {
+        stageCode = 'Stage2';
+        stageBadge = 'Stage 2: 建照掛件/都審 (黃金攔截期)';
+        categoryId = 'Stage2_Permit';
+        categoryName = '建照執照掛件與都審';
+      } else if (text.includes('動土') || text.includes('動工') || text.includes('發包') || text.includes('標案')) {
+        stageCode = 'Stage3';
+        stageBadge = 'Stage 3: 廠務發包與動土';
+        categoryId = 'Stage3_Tender';
+        categoryName = '廠務統包與標案發包';
+      }
+
+      const isHighValue = text.includes('日月光') || text.includes('台積電') || text.includes('半導體') || text.includes('50億') || text.includes('大戶') || text.includes('屏科');
+      const valueRating = isHighValue ? 'A+' : 'A';
+
+      const newItem = {
+        id: `radar_custom_${Date.now()}`,
+        title: finalTitle,
+        full_title: finalTitle,
+        source: finalSource,
+        link: finalUrl,
+        published: published || new Date().toISOString().replace('T', ' ').substring(0, 16),
+        category_id: categoryId,
+        category_name: categoryName,
+        detected_parks: detectedParks.length > 0 ? detectedParks : ['南台灣高科技園區'],
+        detected_companies: detectedCompanies.length > 0 ? detectedCompanies : ['早鳥進駐企業'],
+        stage: stageBadge,
+        stage_code: stageCode,
+        stage_badge: stageBadge,
+        value_rating: valueRating,
+        fetched_at: new Date().toISOString()
+      };
+
+      // 1. 動態插入至雷達清單頂部
+      radarItems.value.unshift(newItem);
+
+      // 2. 本地持久化 (localStorage)
+      const customList = JSON.parse(localStorage.getItem('CUSTOM_RADAR_ITEMS') || '[]');
+      customList.unshift(newItem);
+      localStorage.setItem('CUSTOM_RADAR_ITEMS', JSON.stringify(customList.slice(0, 50)));
+
+      // 3. 🌟 主動寫入 Supabase early_radar 資料表
+      let sbSynced = false;
+      if (window.supabaseManager) {
+        sbSynced = await window.supabaseManager.upsertRadar(newItem);
+      }
+
+      // 4. 重算 Summary
+      calculateLocalSummary();
+
+      alert(`🎉 早鳥情報已成功萃取並置頂加入雷達！\n\n【情報標題】：${finalTitle}\n【預警階段】：${stageBadge}\n【識別實體】：${newItem.detected_companies.join(', ')} / ${newItem.detected_parks.join(', ')}\n\n${sbSynced ? '🟢 已即時同步寫入 Supabase 雲端資料庫 (early_radar)！' : '🟡 本地已更新，點擊「即時雷達掃描」可再次同步至 Supabase。'}`);
+
+      return newItem;
     };
 
     // =========================================================================
@@ -1051,12 +1266,28 @@ createApp({
       leadsSearchQuery,
       leadsFilterRep,
       radarFilterCategory,
-      // 手動新聞速貼狀態與方法
+      // 多通道早鳥情報入庫狀態與方法
       showNewsInputBox,
+      intakeMode,
+      newsUrlInput,
+      isFetchingUrl,
+      isDragging,
+      isParsingFile,
+      uploadedFileName,
+      uploadedFileContent,
+      fileInputRef,
       isParsingNews,
       newsForm,
+      fillSampleUrl,
+      triggerFileInput,
+      handleFileSelect,
+      handleFileDrop,
+      processFile,
+      parseUploadedFile,
+      fetchAndParseUrl,
       fillSampleNews,
       parseAndAddNewsToRadar,
+      runAiExtractionAndSave,
       // 試算器與建照解析
       calcInputs,
       calcResult,

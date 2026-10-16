@@ -203,6 +203,33 @@ def add_custom_radar_item(item: Dict[str, Any]):
     collector.save_cache(items)
     return {"status": "success", "item": item, "total_count": len(items)}
 
+@app.get("/api/fetch_url")
+def fetch_url(url: str = Query(...)):
+    """後端代理網頁內容抓取 (支援各大新聞網站與政府公告)"""
+    import urllib.request
+    import re
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+            title = ""
+            title_m = re.search(r"<title>(.*?)</title>", html, re.I)
+            if title_m:
+                title = title_m.group(1).split(" - ")[0].split(" | ")[0].strip()
+            # 移除 script, style
+            text = re.sub(r"<(script|style).*?>.*?</\1>", "", html, flags=re.S | re.I)
+            # 移除所有 html tags
+            text = re.sub(r"<.*?>", " ", text)
+            # 清理多餘空白
+            text = re.sub(r"\s+", " ", text).strip()
+            return {"status": "success", "url": url, "title": title, "content": text[:10000]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/radar/convert")
 def convert_radar_item(item_data: Dict[str, Any]):
     """將早鳥情報直接轉換為正式追蹤商機"""
