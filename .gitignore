@@ -27,3 +27,19 @@ $RECYCLE.BIN/
 
 # Temporary logs
 *.log
+
+# REA Inspection & Analysis Temp Files
+taipower_index.*
+taipower_default.json
+taipower_config.json
+*.txt
+api_client_section.js
+pole_coordinate_decoder.js
+dghostcaps_*.json
+analyze_*.py
+extract_*.py
+search_*.py
+test_*.py
+download_*.py
+find_*.py
+

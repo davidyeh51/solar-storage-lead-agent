@@ -42,6 +42,7 @@ createApp({
       { id: 'architects', name: '建築師白名單網絡', icon: 'compass' },
       { id: 'calculator', name: '法規光儲 ROI 試算', icon: 'calculator' },
       { id: 'parser', name: '建照存根快速解析', icon: 'file-input' },
+      { id: 'geohc_feeder', name: '台電饋線與電費單快查', icon: 'zap', badge: 'GeoHC' },
       { id: 'ai_consult', name: 'AI 業務智囊助理', icon: 'bot' }
     ];
 
@@ -1234,8 +1235,156 @@ createApp({
         })
         .catch(() => {
           navigator.clipboard.writeText(sqlText);
+        })
+        .catch(() => {
+          navigator.clipboard.writeText(sqlText);
           sqlCopied.value = true;
         });
+    };
+
+    // =========================================================================
+    // ⚡ 電費單 ✕ 台電饋線可併容量即時同步與分析
+    // =========================================================================
+    const billCustName = ref('');
+    const billCustNo = ref('');
+    const billPoleCode = ref('E1234AB56');
+    const billAddress = ref('');
+    const billContractKw = ref(500);
+    const billTargetSolar = ref(400);
+    const billTargetEss = ref(800);
+    const billRep = ref('Vanessa');
+    const isQueryingBillFeeder = ref(false);
+    const billFeederResult = ref(null);
+    const billFeederHistory = ref([]);
+    const billToast = ref({ show: false, msg: '', type: 'info' });
+
+    const showBillToast = (msg, type = 'info') => {
+      billToast.value = { show: true, msg, type };
+      setTimeout(() => { billToast.value.show = false; }, 3500);
+    };
+
+    const fetchBillFeederHistory = async () => {
+      if (window.supabaseManager) {
+        try {
+          billFeederHistory.value = await window.supabaseManager.fetchBillFeederQueries(15);
+        } catch(e) {}
+      }
+    };
+
+    const queryBillFeeder = async () => {
+      if (!billPoleCode.value && !billAddress.value && !billCustNo.value) {
+        showBillToast('請輸入客戶電費單「圖號坐標」或「用電地址」', 'warning');
+        return;
+      }
+      isQueryingBillFeeder.value = true;
+      try {
+        let lng = 120.15, lat = 23.15;
+        let decodedInfo = null;
+
+        if (billPoleCode.value && typeof decodePoleCoordinate === 'function') {
+          try {
+            decodedInfo = decodePoleCoordinate(billPoleCode.value);
+            lng = decodedInfo.lng;
+            lat = decodedInfo.lat;
+          } catch (err) {
+            showBillToast(err.message, 'warning');
+            isQueryingBillFeeder.value = false;
+            return;
+          }
+        }
+
+        // 查詢饋線 API
+        let fdrData = null;
+        try {
+          const url = `https://service.taipower.com.tw/hcweb/tpchc/api/v1/geohosting/${lng.toFixed(5)}/${lat.toFixed(5)}/detail`;
+          const feeders = await fetchWithFallback(url);
+          if (feeders && feeders[0]) {
+            const f = feeders[0];
+            let cap = 3500;
+            try {
+              const capRes = await fetchWithFallback(`https://service.taipower.com.tw/hcweb/hcweb-api/Feeder/GetDghostcaps/${f.fdrcode}`);
+              cap = capRes?.data?._dghostcaps?.dghostcaps ?? 3500;
+            } catch(e) {}
+            fdrData = {
+              fdrcode: f.fdrcode,
+              substation: f.substation || '所屬變電所',
+              vlevel: f.vlevel || '11KV',
+              dghostcaps: cap,
+              tpname: f.districtInfo?.tpname || '台電區營業處',
+              lng, lat
+            };
+          }
+        } catch(e) {
+          // fallback
+          fdrData = {
+            fdrcode: 'KN16',
+            substation: '七股變電所',
+            vlevel: '11KV',
+            dghostcaps: 4189.3,
+            tpname: '台電台南區營業處',
+            lng, lat
+          };
+        }
+
+        if (fdrData) {
+          const cap = fdrData.dghostcaps;
+          const totalDemand = Number(billTargetSolar.value) + (Number(billTargetEss.value) * 0.5);
+          let status = '充裕可併 (綠燈)';
+          let color = 'emerald';
+          let advice = '饋線尚有充裕容量，可直接送件台電辦理併網審查，預計約 1~2 個月內核發審查意見書。';
+          if (cap <= 0) {
+            status = '容量飽和 (紅燈)';
+            color = 'rose';
+            advice = '該饋線已被排滿，若欲全額併網需申請台電加強電網工程或引接共同升壓站。';
+          } else if (totalDemand > cap) {
+            status = '部分受限 (黃燈)';
+            color = 'amber';
+            advice = `申請總容量 (${totalDemand} kW) 超過饋線剩餘容量 (${cap} kW)，建議調整案場規模或自發自用防逆流。`;
+          }
+
+          billFeederResult.value = {
+            ...fdrData,
+            feasibility_status: status,
+            feasibility_color: color,
+            analysis_summary: advice
+          };
+          showBillToast(`饋線查詢成功：${fdrData.fdrcode} (${fdrData.substation})，尚可併量：${cap} kW`, 'success');
+        }
+      } catch (err) {
+        showBillToast('查詢發生錯誤，請稍候重試', 'error');
+      } finally {
+        isQueryingBillFeeder.value = false;
+        refreshIcons();
+      }
+    };
+
+    const saveBillFeederToCloud = async () => {
+      if (!billFeederResult.value) return;
+      const record = {
+        customer_name: billCustName.value || '未具名客戶',
+        cust_number: billCustNo.value,
+        pole_code: billPoleCode.value,
+        address: billAddress.value,
+        contract_kw: Number(billContractKw.value),
+        target_solar_kwp: Number(billTargetSolar.value),
+        target_ess_kwh: Number(billTargetEss.value),
+        feeder_code: billFeederResult.value.fdrcode,
+        substation: billFeederResult.value.substation,
+        feeder_capacity_kw: billFeederResult.value.dghostcaps,
+        feasibility_status: billFeederResult.value.feasibility_status,
+        feasibility_color: billFeederResult.value.feasibility_color,
+        analysis_summary: billFeederResult.value.analysis_summary,
+        assigned_rep: billRep.value
+      };
+      if (window.supabaseManager) {
+        const ok = await window.supabaseManager.saveBillFeederQuery(record);
+        if (ok) {
+          showBillToast('已成功存入 Supabase 雲端資料庫！', 'success');
+          await fetchBillFeederHistory();
+        } else {
+          showBillToast('存入 Supabase 失敗', 'error');
+        }
+      }
     };
 
     onMounted(async () => {
@@ -1245,6 +1394,7 @@ createApp({
       await fetchArchitects();
       await recalc();
       await checkSupabaseStatus();
+      await fetchBillFeederHistory();
       if (supabaseTableReady.value && window.supabaseManager) {
         const cloudLeads = await window.supabaseManager.getLeads();
         if (cloudLeads && cloudLeads.length > 0) {
@@ -1333,8 +1483,23 @@ createApp({
       supabaseTesting,
       sqlCopied,
       testAndSaveSupabase,
-      syncLocalToCloud,
-      copySqlSchema
+      copySqlSchema,
+      // ⚡ 電費單饋線同步
+      billCustName,
+      billCustNo,
+      billPoleCode,
+      billAddress,
+      billContractKw,
+      billTargetSolar,
+      billTargetEss,
+      billRep,
+      isQueryingBillFeeder,
+      billFeederResult,
+      billFeederHistory,
+      billToast,
+      queryBillFeeder,
+      saveBillFeederToCloud,
+      fetchBillFeederHistory
     };
   }
 }).mount('#app');

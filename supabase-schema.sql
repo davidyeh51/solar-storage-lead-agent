@@ -137,3 +137,144 @@ VALUES
 ('lead_005', '(115)南工建字第01988號', '高雄金屬精工老客戶二期智慧綠能廠房擴建案', '舜煜實業股份有限公司 (Key Account)', '喻台生建築師事務所', '根基營造股份有限公司', 'C-2 (一般金屬精密加工廠)', '鋼骨構造 (S)', '台南市新市產業園區二期', 14000, 7000, 14000, 2200, '2026-09-18', 'Stage2', 'Stage 2: 建照核發 (擴建二期)', '議價簽約中 (一期續約客戶)', 'emerald', 'Jane', 'Jane 負責之 S1 既有 Key Account 二期擴廠案，業主對一期發電收益極滿意，已指名二期光儲合約由進金生統包。'),
 ('lead_006', '(115)南科微電第008號', '國科會南科高雄園區智慧微電網示範標準廠房暨防救災儲能標案', '南部科學園區管理局 / 國科會', '宗邁建築師事務所', '公開招標中', 'C-2 / 公共設施 (示範標準廠房)', '鋼骨鋼筋混凝土 (SRC)', '高雄市路竹區南科高雄園區', 20000, 8000, 24000, 3000, '2026-10-01', 'Stage3', 'Stage 3: 公共標案招標 (發包期)', '備標聯營中 (結合EMS夥伴)', 'cyan', 'Julia', 'Julia 負責之 S5 微電網旗艦標案，需建置 800kW 屋頂光電 + 1.2MWh 儲能 + EMS 區域微電網黑啟動功能。')
 ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 4. 台電饋線可併網容量資料庫 (feeders)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.feeders (
+    fdrcode TEXT PRIMARY KEY,
+    fdrname TEXT,
+    substation TEXT,
+    vlevel TEXT DEFAULT '11KV',
+    dghostcaps NUMERIC DEFAULT 0,
+    tpid INT,
+    tpname TEXT,
+    tpaddr TEXT,
+    tptel TEXT,
+    x NUMERIC,
+    y NUMERIC,
+    lng NUMERIC,
+    lat NUMERIC,
+    geom JSONB,
+    source_updated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 5. 共同升壓站資料表 (stepup_substations)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.stepup_substations (
+    uuid TEXT PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    substation_id TEXT,
+    district TEXT,
+    due_date TEXT,
+    bscapacity NUMERIC DEFAULT 0,
+    usercapacity NUMERIC DEFAULT 0,
+    userapcapacity NUMERIC DEFAULT 0,
+    userleftcapacity NUMERIC DEFAULT 0,
+    othercapacity NUMERIC DEFAULT 0,
+    otherapcapacity NUMERIC DEFAULT 0,
+    otherleftcapacity NUMERIC DEFAULT 0,
+    longitude NUMERIC,
+    latitude NUMERIC,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 6. 客戶電費單 ✕ 饋線同步查詢記錄表 (bill_feeder_queries)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.bill_feeder_queries (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    cust_number TEXT,
+    pole_code TEXT,
+    address TEXT,
+    contract_kw NUMERIC DEFAULT 0,
+    voltage_level TEXT DEFAULT '高壓 11.4kV',
+    target_solar_kwp NUMERIC DEFAULT 0,
+    target_ess_kwh NUMERIC DEFAULT 0,
+    feeder_code TEXT,
+    substation TEXT,
+    feeder_capacity_kw NUMERIC DEFAULT 0,
+    feasibility_status TEXT DEFAULT '充裕可併',
+    feasibility_color TEXT DEFAULT 'emerald',
+    analysis_summary TEXT,
+    assigned_rep TEXT DEFAULT 'Vanessa',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 7. 系統一鍵更新與台電同步紀錄表 (system_sync_logs)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.system_sync_logs (
+    id SERIAL PRIMARY KEY,
+    sync_type TEXT DEFAULT 'full_sync',
+    source_date TEXT,
+    feeders_count INT DEFAULT 0,
+    substations_count INT DEFAULT 0,
+    status TEXT DEFAULT 'SUCCESS',
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 🔒 擴充資料表之 RLS (Row Level Security)
+-- ==============================================================================
+ALTER TABLE public.feeders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stepup_substations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bill_feeder_queries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_sync_logs ENABLE ROW LEVEL SECURITY;
+
+-- 允許 anon / authenticated 讀取
+DROP POLICY IF EXISTS "Allow anon read feeders" ON public.feeders;
+CREATE POLICY "Allow anon read feeders" ON public.feeders FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow anon read stepup_substations" ON public.stepup_substations;
+CREATE POLICY "Allow anon read stepup_substations" ON public.stepup_substations FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow anon read bill_feeder_queries" ON public.bill_feeder_queries;
+CREATE POLICY "Allow anon read bill_feeder_queries" ON public.bill_feeder_queries FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow anon read system_sync_logs" ON public.system_sync_logs;
+CREATE POLICY "Allow anon read system_sync_logs" ON public.system_sync_logs FOR SELECT TO anon, authenticated USING (true);
+
+-- 允許前端建立與更新饋線資料、電費單記錄與更新日誌
+DROP POLICY IF EXISTS "Allow anon write feeders" ON public.feeders;
+CREATE POLICY "Allow anon write feeders" ON public.feeders FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon write stepup_substations" ON public.stepup_substations;
+CREATE POLICY "Allow anon write stepup_substations" ON public.stepup_substations FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon write bill_feeder_queries" ON public.bill_feeder_queries;
+CREATE POLICY "Allow anon write bill_feeder_queries" ON public.bill_feeder_queries FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon write system_sync_logs" ON public.system_sync_logs;
+CREATE POLICY "Allow anon write system_sync_logs" ON public.system_sync_logs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- ⚡ 饋線與升壓站種子資料
+-- ==============================================================================
+INSERT INTO public.feeders (fdrcode, fdrname, substation, vlevel, dghostcaps, tpid, tpname, tpaddr, tptel, lng, lat, source_updated_at)
+VALUES 
+('KN16', '七股28號饋線', '七股變電所', '11KV', 4189.3, 108, '台電台南區處', '台南市忠義路一段109號', '06-2160121#2511', 120.15, 23.15, '2026-09-25T02:10:55'),
+('IS30', '秀水754號饋線', '秀水變電所', '11KV', -2.0, 106, '台電彰化區處', '彰化市中山路二段418號', '04-7256461#6306', 120.35, 23.95, '2026-09-25T02:10:55'),
+('PT08', '屏東工業饋線08', '屏東變電所', '22.8KV', 5240.0, 110, '台電屏東區處', '屏東市逢甲路', '08-7322111', 120.48, 22.67, '2026-09-25T02:10:55'),
+('BP12', '白埔高壓饋線12', '岡山變電所', '22.8KV', 7850.0, 109, '台電高雄區處', '高雄市忠孝一路', '07-2011211', 120.31, 22.78, '2026-09-25T02:10:55')
+ON CONFLICT (fdrcode) DO UPDATE SET 
+    dghostcaps = EXCLUDED.dghostcaps,
+    source_updated_at = EXCLUDED.source_updated_at,
+    updated_at = NOW();
+
+INSERT INTO public.stepup_substations (uuid, company_name, substation_id, longitude, latitude, bscapacity, userleftcapacity, otherleftcapacity, due_date)
+VALUES
+('14cd5e6f-3e47-4de3-8d3e-c77a477a3390', '天英能源股份有限公司', 'TY-01', 120.1279, 23.12406, 100, 25.5, 12.8, '2026-12-31'),
+('77bba5fa-a678-4e5b-ba50-77b61cdbba63', '星能股份有限公司', 'SN-02', 120.1026, 23.1248, 150, 40.0, 18.5, '2027-06-30'),
+('718fa58f-e082-425e-963c-d3a56df5ec76', '彰品風力發電股份有限公司', 'CP-01', 120.31188, 23.9821, 80, 15.0, 5.0, '2026-11-30')
+ON CONFLICT (uuid) DO NOTHING;
+
+INSERT INTO public.system_sync_logs (sync_type, source_date, feeders_count, substations_count, status, message)
+VALUES ('full_sync', '2026-09-25', 4, 3, 'SUCCESS', '初始化台電配電級再生能源可併容量與升壓站同步完成');
+

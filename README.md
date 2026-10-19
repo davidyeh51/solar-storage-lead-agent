@@ -85,19 +85,65 @@ flowchart TD
 ## 🌐 線上部署與 Supabase 雲端串接
 
 - **GitHub Pages 線上戰情室網址**：👉 [https://davidyeh51.github.io/solar-storage-lead-agent/](https://davidyeh51.github.io/solar-storage-lead-agent/)
+- **台電饋線可併容量獨立 GIS 系統**：👉 [https://davidyeh51.github.io/solar-storage-lead-agent/geohc.html](https://davidyeh51.github.io/solar-storage-lead-agent/geohc.html)
 - **GitHub 專案倉庫**：👉 [https://github.com/davidyeh51/solar-storage-lead-agent](https://github.com/davidyeh51/solar-storage-lead-agent)
 
-### ⚡ Supabase BaaS 雲端資料庫串接指南
+---
+
+## ⚡ 四、 台電配電級饋線可併容量 ✕ 客戶電費單同步分析系統 (GeoHC Engine)
+
+本功能透過 **REA (Reverse Engineer Anything) 逆向工程技能**，深度分析台電官方查詢網頁（`https://service.taipower.com.tw/hcweb/geohc/`）前端 JS 打包檔（`index-Tx8clZ1D.js`），完整重現並強化其核心能力：
+
+### 1. 🔍 REA 逆向工程核心突破與演算法還原
+- **台電官方網格切片圖層 (XYZ Tile)**：
+  - 成功逆向出台電全島配電級饋線容量熱區圖層：`https://service.taipower.com.tw/hcweb/tileserver/twIn16withStyle40_all/{z}/{x}/{y}.png`
+  - 支援 CORS 跨域請求，可在 Leaflet / OpenLayers 地圖引擎上流暢疊加展示。
+- **電費單「圖號坐標」(Power Pole Coordinate) 數學逆向解算**：
+  - 客戶電費單上的 9 碼或 11 碼圖號（如 `E1234AB56`、`Q5050AA11`、`K5050AA11`），第一碼代表全台 23 個分區網格（A~Y）。
+  - 依台電內部常數推導出 TWD67 (EPSG:3828 / EPSG:3827) 平面坐標後，經由 Proj4 轉換為 WGS84 (EPSG:4326) 精確經緯度。
+- **台電中央 API 逆向串接**：
+  - 坐標空間探測：`https://service.taipower.com.tw/hcweb/tpchc/api/v1/geohosting/{lng}/{lat}/detail`
+  - 饋線容量查詢：`https://service.taipower.com.tw/hcweb/hcweb-api/Feeder/GetDghostcaps/{feederId}`
+  - 最新資料日期：`https://service.taipower.com.tw/hcweb/hcweb-api/SystemInfo/GetLatestUpdateTime`
+  - 共同升壓站業者名冊：`https://service.taipower.com.tw/hcweb/hcweb-api/StepupSubstation`
+
+### 2. 🎯 目標：取得客戶電費單時，同步查詢饋線資訊
+當業務取得客戶電費單時，系統提供**「電費單 ✕ 饋線容量智能試算」**：
+1. **輸入資訊**：客戶戶名、台電電號 (11碼)、圖號座標 (如 `E1234AB56`)、契約容量 (kW)、擬規劃光電 (kWp) / 儲能 (kWh)。
+2. **自動即時計算**：
+   - 經緯度精確定位於地圖。
+   - 立即提取該電桿所屬之**饋線代號**、**變電所名稱**、**供電電壓**（11.4kV / 22.8kV）、**尚可併網容量** ($kW$)。
+3. **併網可行性三色燈號判定**：
+   - 🟢 **充裕可併 (綠燈)**：饋線餘量 $> 1,000 kW$，可直接送件審查。
+   - 🟡 **部分受限 (黃燈)**：饋線餘量有限或申請量超出餘額，建議調降規模或自發自用防逆流。
+   - 🔴 **容量飽和 (紅燈)**：餘裕 $\le 0 kW$，需申請台電加強電網或引接共同升壓站。
+4. **一鍵存檔至 Supabase**：直接記錄於雲端 `bill_feeder_queries` 資料表，作為後續業務拜訪依據。
+
+### 3. 🔄 「一鍵更新」至台電最新日期機制
+- 頂部導航列顯眼提供 **「一鍵更新最新資料」** 按鈕。
+- 點擊後，系統直接連線台電中央伺服器，抓取官方最新審查數據基準日（如 `2026/09/25`）與各升壓站容量，並寫入 Supabase `system_sync_logs` 同步日誌。
+
+---
+
+## ⚡ Supabase BaaS 雲端資料庫串接指南
 本專案採用 **GitHub Pages ✕ Supabase BaaS** 現代無伺服器架構，支援免後端純靜態雙向同步：
 1. **執行 SQL 結構腳本**：
    - 登入 [Supabase Dashboard](https://supabase.com/dashboard/project/cowljafosekwvxithwjd/sql/new)
    - 複製專案根目錄的 [`supabase-schema.sql`](./supabase-schema.sql) 貼入 SQL Editor 並執行
-   - 腳本將自動建立 `solar_leads`、`architects`、`early_radar` 資料表並強制啟用 **RLS (Row Level Security)** 行級安全防護
+   - 腳本將自動建立：
+     - `solar_leads` (早期案場庫)
+     - `architects` (建築師網絡)
+     - `early_radar` (實時情報雷達)
+     - `feeders` (台電饋線容量庫)
+     - `stepup_substations` (共同升壓站名冊)
+     - `bill_feeder_queries` (電費單同步查詢歷史記錄)
+     - `system_sync_logs` (系統一鍵更新同步紀錄)
+     - 強制啟用 **RLS (Row Level Security)** 行級安全防護
 2. **網頁介面即時連線**：
-   - 打開 [GitHub Pages 網站](https://davidyeh51.github.io/solar-storage-lead-agent/)
+   - 打開 [GitHub Pages 網站](https://davidyeh51.github.io/solar-storage-lead-agent/) 或 [GeoHC 饋線地圖](https://davidyeh51.github.io/solar-storage-lead-agent/geohc.html)
    - 點擊頂部右上角的 **「Supabase 設定」** 狀態標籤（系統已自動預填您的專案連線資訊）
    - 點擊 **「儲存並測試連線」**，狀態將轉為 **🟢 Supabase 雲端已連線**！
-   - 點擊 **「同步本機案場至雲端」** 即可一鍵雙向更新案場與建築師網絡！
+   - 支援全功能雙向即時讀寫！
 
 ---
 

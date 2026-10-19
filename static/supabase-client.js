@@ -244,7 +244,175 @@ class SupabaseManager {
       return false;
     }
   }
+
+  // ==========================================
+  // ⚡ 台電饋線可併網容量與電費單查詢整合方法
+  // ==========================================
+
+  // 1. 取得饋線快取或單筆饋線
+  async getFeederByCode(fdrcode) {
+    if (!this.client) this.init();
+    if (!this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('feeders')
+        .select('*')
+        .eq('fdrcode', fdrcode.trim().toUpperCase())
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn('[Supabase] getFeederByCode error:', e);
+      return null;
+    }
+  }
+
+  // 2. 儲存/更新饋線資料
+  async upsertFeeder(feeder) {
+    if (!this.client) this.init();
+    if (!this.client || !feeder) return false;
+    try {
+      const { error } = await this.client
+        .from('feeders')
+        .upsert(feeder, { onConflict: 'fdrcode' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] upsertFeeder error:', e);
+      return false;
+    }
+  }
+
+  // 3. 取得所有共同升壓站列表
+  async fetchStepupSubstations() {
+    if (!this.client) this.init();
+    if (!this.client) return [];
+    try {
+      const { data, error } = await this.client
+        .from('stepup_substations')
+        .select('*')
+        .order('company_name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.warn('[Supabase] fetchStepupSubstations error:', e);
+      return [];
+    }
+  }
+
+  // 4. 批次儲存共同升壓站
+  async batchUpsertSubstations(substations) {
+    if (!this.client) this.init();
+    if (!this.client || !substations || substations.length === 0) return false;
+    try {
+      const { error } = await this.client
+        .from('stepup_substations')
+        .upsert(substations, { onConflict: 'uuid' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] batchUpsertSubstations error:', e);
+      return false;
+    }
+  }
+
+  // 5. 儲存客戶電費單 ✕ 饋線同步查詢記錄
+  async saveBillFeederQuery(query) {
+    if (!this.client) this.init();
+    if (!this.client) return false;
+    try {
+      const record = {
+        id: query.id || `bill_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        customer_name: query.customer_name || '未具名客戶',
+        cust_number: query.cust_number || '',
+        pole_code: query.pole_code || '',
+        address: query.address || '',
+        contract_kw: Number(query.contract_kw) || 0,
+        voltage_level: query.voltage_level || '高壓 11.4kV',
+        target_solar_kwp: Number(query.target_solar_kwp) || 0,
+        target_ess_kwh: Number(query.target_ess_kwh) || 0,
+        feeder_code: query.feeder_code || '',
+        substation: query.substation || '',
+        feeder_capacity_kw: Number(query.feeder_capacity_kw) || 0,
+        feasibility_status: query.feasibility_status || '待審查',
+        feasibility_color: query.feasibility_color || 'emerald',
+        analysis_summary: query.analysis_summary || '',
+        assigned_rep: query.assigned_rep || 'Vanessa',
+        created_at: new Date().toISOString()
+      };
+      const { error } = await this.client
+        .from('bill_feeder_queries')
+        .upsert(record, { onConflict: 'id' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] saveBillFeederQuery error:', e);
+      return false;
+    }
+  }
+
+  // 6. 讀取電費單饋線歷史查詢清單
+  async fetchBillFeederQueries(limit = 20) {
+    if (!this.client) this.init();
+    if (!this.client) return [];
+    try {
+      const { data, error } = await this.client
+        .from('bill_feeder_queries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.warn('[Supabase] fetchBillFeederQueries error:', e);
+      return [];
+    }
+  }
+
+  // 7. 記錄一鍵更新同步紀錄
+  async logSync(syncInfo) {
+    if (!this.client) this.init();
+    if (!this.client) return false;
+    try {
+      const { error } = await this.client
+        .from('system_sync_logs')
+        .insert([{
+          sync_type: syncInfo.sync_type || 'full_sync',
+          source_date: syncInfo.source_date || new Date().toISOString().substring(0, 10),
+          feeders_count: syncInfo.feeders_count || 0,
+          substations_count: syncInfo.substations_count || 0,
+          status: syncInfo.status || 'SUCCESS',
+          message: syncInfo.message || '台電資料同步完成',
+          created_at: new Date().toISOString()
+        }]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] logSync error:', e);
+      return false;
+    }
+  }
+
+  // 8. 讀取最新同步紀錄
+  async getLatestSyncLog() {
+    if (!this.client) this.init();
+    if (!this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('system_sync_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn('[Supabase] getLatestSyncLog error:', e);
+      return null;
+    }
+  }
 }
 
 // 註冊全域單例
 window.supabaseManager = new SupabaseManager();
+
