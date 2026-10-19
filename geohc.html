@@ -108,6 +108,16 @@
         <span>電費單饋線分析儀</span>
       </button>
 
+      <!-- 📋 電費單案場帳冊 (Sheet) 按鈕 -->
+      <button 
+        onclick="window.geoHCApp.openSheetModal()" 
+        class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition active:scale-95"
+      >
+        <i data-lucide="table" class="w-3.5 h-3.5 text-cyan-200"></i>
+        <span>電費單案場帳冊 (Sheet)</span>
+        <span id="headerSheetBadge" class="ml-1 px-1.5 py-0.2 rounded-full bg-blue-800 text-white font-mono text-[10px]">0</span>
+      </button>
+
       <!-- 返回業務戰情室 -->
       <a 
         href="index.html" 
@@ -149,8 +159,9 @@
             <span>升壓站</span>
           </button>
           <button data-tab="tabHistory" class="tab-btn px-2.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition flex items-center justify-center gap-1">
-            <i data-lucide="history" class="w-3.5 h-3.5"></i>
-            <span>電費單紀錄</span>
+            <i data-lucide="table" class="w-3.5 h-3.5"></i>
+            <span>案場帳冊</span>
+            <span id="billSheetBadge" class="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-mono text-[9px]">0</span>
           </button>
         </div>
       </div>
@@ -289,14 +300,25 @@
           </div>
         </div>
 
-        <!-- 6. 客戶電費單查詢歷史 (Supabase) -->
+        <!-- 6. 客戶電費單案場帳冊清冊 (IndexedDB + Supabase) -->
         <div id="tabHistory" class="tab-pane hidden space-y-3">
           <div class="text-xs text-slate-500 flex justify-between items-center">
-            <span>最近客戶電費單查詢紀錄</span>
-            <button onclick="window.geoHCApp.loadInitialData()" class="text-[10px] text-[#005A9C] hover:underline flex items-center gap-0.5">
+            <span>電費單案場帳冊清冊</span>
+            <button onclick="window.geoHCApp.loadBillLedger()" class="text-[10px] text-[#005A9C] hover:underline flex items-center gap-0.5">
               <i data-lucide="refresh-cw" class="w-3 h-3"></i> 重新載入
             </button>
           </div>
+
+          <!-- 1-Click 開啟全螢幕帳冊清冊 -->
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.openSheetModal()" 
+            class="w-full py-2.5 rounded-xl bg-[#005A9C] hover:bg-[#004780] text-white text-xs font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <i data-lucide="table" class="w-4 h-4 text-cyan-200"></i>
+            <span>開啟案場帳冊清冊 (Excel 匯出)</span>
+          </button>
+
           <div id="historyQueriesContainer" class="space-y-2 max-h-[380px] overflow-y-auto no-scrollbar">
             <!-- 動態注入歷史紀錄 -->
           </div>
@@ -408,6 +430,13 @@
             </span>
             <button 
               type="button"
+              onclick="window.geoHCApp.loadSampleBill('himax')"
+              class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-blue-200 text-[#005A9C] text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
+            >
+              <span>🔬 奇景光電 (4K71 / 250 kW / 台南新市)</span>
+            </button>
+            <button 
+              type="button"
               onclick="window.geoHCApp.loadSampleBill('runtai')"
               class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-blue-200 text-[#005A9C] text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
             >
@@ -422,6 +451,9 @@
             </button>
           </div>
         </div>
+
+        <!-- 自動留存至帳冊 Sheet 成功 Banner -->
+        <div id="billPreservedBanner" class="hidden"></div>
 
         <!-- 客戶基本電費單資訊 -->
         <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
@@ -510,6 +542,147 @@
           <i data-lucide="cloud-upload" class="w-4 h-4"></i>
           儲存並同步至 Supabase 案場庫
         </button>
+      </div>
+    </div>
+  <!-- MODAL: 電費單案場帳冊清冊 (Bill Records Sheet) -->
+  <div id="billSheetModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-[#CBD5E1] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp">
+      <!-- 標題欄 -->
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-[#005A9C] text-white flex items-center justify-center shadow-md">
+            <i data-lucide="table" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-[#051C2C]">電費單案場帳冊清冊 (Bill Records Sheet)</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold font-mono">實時紀錄</span>
+            </div>
+            <p class="text-xs text-slate-500">每一次上傳電費單解析後自動留存入庫，留存原始 PDF/相片檔案並支援 Excel / CSV 一鍵匯出</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <!-- 匯出 CSV 按鈕 -->
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.exportSheetCSV()" 
+            class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+          >
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>匯出 Excel / CSV 帳冊</span>
+          </button>
+
+          <!-- 上傳新電費單按鈕 -->
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.closeSheetModal(); document.getElementById('billAnalyzerModal').classList.remove('hidden')" 
+            class="px-3.5 py-2 rounded-xl bg-[#005A9C] hover:bg-[#004780] text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+          >
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+            <span>上傳新電費單</span>
+          </button>
+
+          <!-- 關閉 -->
+          <button onclick="window.geoHCApp.closeSheetModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 核心 KPI 摘要卡片 -->
+      <div class="p-4 bg-white border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div class="p-3 rounded-xl bg-blue-50/60 border border-blue-100">
+          <span class="text-[10px] text-slate-500 block font-medium">總案場電費單數</span>
+          <span id="sheetKpiTotal" class="text-lg font-bold font-mono text-[#005A9C]">3</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <span class="text-[10px] text-slate-500 block font-medium">總契約容量合計</span>
+          <span id="sheetKpiKw" class="text-lg font-bold font-mono text-slate-800">2,350 kW</span>
+        </div>
+        <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
+          <span class="text-[10px] text-emerald-700 block font-medium">綠燈充裕可併案場</span>
+          <span id="sheetKpiGreen" class="text-lg font-bold font-mono text-emerald-600">3</span>
+        </div>
+        <div class="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
+          <span class="text-[10px] text-amber-700 block font-medium">檔案持久保存狀態</span>
+          <span class="text-xs font-bold text-amber-800 mt-1 block">IndexedDB + 雲端雙軌</span>
+        </div>
+      </div>
+
+      <!-- 搜尋篩選與操作列 -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div class="flex-1 relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+          <input 
+            id="sheetSearchInput" 
+            type="text" 
+            placeholder="搜尋案場戶名、電號(11碼)、饋線代號、地址..." 
+            oninput="window.geoHCApp.filterSheetTable()" 
+            class="w-full pl-9 pr-4 py-1.5 rounded-xl bg-white border border-slate-300 text-xs focus:outline-none focus:border-[#005A9C]"
+          >
+        </div>
+        <span class="text-[11px] text-slate-400">點擊「預覽」可立即檢視原始 PDF 或照片</span>
+      </div>
+
+      <!-- 表格本體 (McKinsey High-Density Table) -->
+      <div class="overflow-x-auto overflow-y-auto flex-1 p-0">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-[#051C2C] text-white text-[11px] sticky top-0 z-10 uppercase tracking-wider">
+            <tr>
+              <th class="px-3 py-2.5 font-semibold text-center w-12">#</th>
+              <th class="px-3 py-2.5 font-semibold">上傳時間</th>
+              <th class="px-3 py-2.5 font-semibold">案場 / 戶名</th>
+              <th class="px-3 py-2.5 font-semibold">台電電號</th>
+              <th class="px-3 py-2.5 font-semibold">饋線代號</th>
+              <th class="px-3 py-2.5 font-semibold text-right">可併容量</th>
+              <th class="px-3 py-2.5 font-semibold text-right">契約容量</th>
+              <th class="px-3 py-2.5 font-semibold text-center">併網可行性</th>
+              <th class="px-3 py-2.5 font-semibold text-center">原始電費單檔</th>
+              <th class="px-3 py-2.5 font-semibold text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody id="sheetTableBody" class="divide-y divide-slate-100 bg-white">
+            <!-- 動態注入表格內容 -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 底部關閉按鈕 -->
+      <div class="p-3 border-t border-slate-200 flex justify-end bg-slate-50 rounded-b-2xl">
+        <button onclick="window.geoHCApp.closeSheetModal()" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition">
+          關閉帳冊視窗
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: 原始電費單檔案預覽視窗 (PDF / 圖檔) -->
+  <div id="billPreviewModal" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-[#005A9C] text-white flex items-center justify-center">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+          </div>
+          <div id="billPreviewTitle">
+            <span class="font-bold text-[#051C2C]">電費單原始檔預覽</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button 
+            id="billPreviewDownloadBtn" 
+            class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1"
+          >
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> 下載檔案
+          </button>
+          <button onclick="window.geoHCApp.closeBillPreviewModal()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <div id="billPreviewContent" class="flex-1 p-2 bg-slate-100 overflow-auto">
+        <!-- 動態嵌入 iframe 或 img -->
       </div>
     </div>
   </div>

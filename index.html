@@ -1091,6 +1091,12 @@
                     快速示範電費單 (1-Click 直出)：
                   </span>
                   <button 
+                    @click="loadSampleBill('himax')"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
+                  >
+                    <span>🔬 奇景光電 (4K71 / 250 kW / 台南新市)</span>
+                  </button>
+                  <button 
                     @click="loadSampleBill('runtai')"
                     class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-blue-200 text-[#005A9C] text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
                   >
@@ -1298,6 +1304,192 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- 電費單案場帳冊清冊 (Sheet Ledger) -->
+        <div class="p-5 rounded-2xl bg-white border border-[#E2E8F0] shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#005A9C] text-white">Sheet 智慧帳冊</span>
+                <h3 class="text-sm font-bold text-[#051C2C] flex items-center gap-2">
+                  <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
+                  電費單案場帳冊清冊 (Bill Ledger Sheet)
+                </h3>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#005A9C] border border-blue-200">
+                  已留存 {{ uploadedBillsLedger.length }} 筆
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">每次上傳電費單辨識後自動歸檔至此 Sheet，完整保存原始 PDF / 照片 (IndexedDB 本地持久化)，支援隨時預覽、下載與 1 鍵匯出 Excel。</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="relative">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+                <input 
+                  v-model="billSheetSearch" 
+                  type="text" 
+                  placeholder="搜尋案場、電號、饋線、地址..." 
+                  class="pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:outline-none focus:border-[#005A9C] w-56 transition"
+                >
+              </div>
+              <button 
+                @click="exportBillSheet"
+                class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+              >
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>匯出 Excel / CSV 帳冊</span>
+              </button>
+              <button 
+                @click="loadAppBillLedger"
+                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition active:scale-95 flex items-center gap-1"
+              >
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>刷新</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI 統計摘要條 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-500 block">總留存電費單</span>
+                <span class="text-lg font-bold font-mono text-[#005A9C]">{{ uploadedBillsLedger.length }} 份</span>
+              </div>
+              <i data-lucide="files" class="w-5 h-5 text-[#005A9C]/40"></i>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-500 block">充裕可併 (綠燈)</span>
+                <span class="text-lg font-bold font-mono text-emerald-600">
+                  {{ uploadedBillsLedger.filter(b => (b.feasibilityStatus || '').includes('綠燈')).length }} 場
+                </span>
+              </div>
+              <i data-lucide="check-circle" class="w-5 h-5 text-emerald-600/40"></i>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-500 block">累積契約容量</span>
+                <span class="text-lg font-bold font-mono text-[#051C2C]">
+                  {{ uploadedBillsLedger.reduce((sum, b) => sum + (Number(b.contractKw) || 0), 0).toLocaleString() }} kW
+                </span>
+              </div>
+              <i data-lucide="zap" class="w-5 h-5 text-amber-500/40"></i>
+            </div>
+            <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-500 block">平均饋線充裕度</span>
+                <span class="text-lg font-bold font-mono text-indigo-700">
+                  {{ uploadedBillsLedger.length ? Math.round(uploadedBillsLedger.reduce((sum, b) => sum + (Number(b.feederCapKw) || 0), 0) / uploadedBillsLedger.length).toLocaleString() : 0 }} kW
+                </span>
+              </div>
+              <i data-lucide="activity" class="w-5 h-5 text-indigo-600/40"></i>
+            </div>
+          </div>
+
+          <!-- Sheet 帳冊表格 -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-50/80 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
+                  <th class="p-3 w-12 text-center">#</th>
+                  <th class="p-3 min-w-[200px]">案場 / 客戶名稱</th>
+                  <th class="p-3 min-w-[120px]">台電電號</th>
+                  <th class="p-3 min-w-[140px]">饋線 / 變電所</th>
+                  <th class="p-3 text-right min-w-[100px]">饋線容量</th>
+                  <th class="p-3 text-right min-w-[90px]">契約容量</th>
+                  <th class="p-3 text-center min-w-[110px]">併網評估</th>
+                  <th class="p-3 min-w-[180px]">用電地址</th>
+                  <th class="p-3 min-w-[130px]">上傳時間</th>
+                  <th class="p-3 text-center min-w-[170px]">留存檔案與操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr 
+                  v-for="(bill, idx) in filteredBillsLedger" 
+                  :key="bill.id"
+                  class="hover:bg-blue-50/40 transition group"
+                >
+                  <td class="p-3 text-center font-mono text-slate-400 text-[11px]">{{ idx + 1 }}</td>
+                  <td class="p-3 font-semibold text-[#051C2C]">
+                    <div class="flex items-center gap-1.5">
+                      <span class="truncate max-w-[180px]">{{ bill.customerName }}</span>
+                      <span v-if="bill.fileName" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200 truncate max-w-[100px]" :title="bill.fileName">
+                        📄 {{ bill.fileName }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="p-3 font-mono text-slate-600 font-medium">{{ bill.custNumber || '-' }}</td>
+                  <td class="p-3">
+                    <span class="font-bold text-[#005A9C] font-mono">{{ bill.feederCode }}</span>
+                    <span class="text-[11px] text-slate-500 block truncate max-w-[130px]">{{ bill.substation }}</span>
+                  </td>
+                  <td class="p-3 text-right font-mono font-bold text-emerald-600">
+                    {{ (bill.feederCapKw || 0).toLocaleString() }} <span class="text-[10px] text-slate-400">kW</span>
+                  </td>
+                  <td class="p-3 text-right font-mono font-bold text-slate-700">
+                    {{ (bill.contractKw || 0).toLocaleString() }} <span class="text-[10px] text-slate-400">kW</span>
+                  </td>
+                  <td class="p-3 text-center">
+                    <span 
+                      class="px-2 py-0.5 rounded-full text-[10px] font-bold border inline-block"
+                      :class="(bill.feasibilityStatus || '').includes('綠燈') ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : ((bill.feasibilityStatus || '').includes('黃燈') ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-rose-50 text-rose-800 border-rose-300')"
+                    >
+                      {{ bill.feasibilityStatus || '充裕可併 (綠燈)' }}
+                    </span>
+                  </td>
+                  <td class="p-3 text-slate-600 text-[11px] truncate max-w-[200px]" :title="bill.address">
+                    {{ bill.address || '-' }}
+                  </td>
+                  <td class="p-3 text-slate-400 text-[10px] font-mono">
+                    {{ bill.uploadedAt || bill.timestamp }}
+                  </td>
+                  <td class="p-3 text-center">
+                    <div class="flex items-center justify-center space-x-1.5">
+                      <button 
+                        @click="previewLedgerBill(bill)" 
+                        title="線上預覽原始電費單"
+                        class="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#005A9C] font-semibold text-[11px] transition flex items-center gap-1 active:scale-95"
+                      >
+                        <i data-lucide="eye" class="w-3 h-3"></i>
+                        <span>預覽</span>
+                      </button>
+                      <button 
+                        @click="downloadLedgerBill(bill)" 
+                        title="下載原始 PDF / 圖檔"
+                        class="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition active:scale-95"
+                      >
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                      </button>
+                      <button 
+                        @click="applyLedgerBillToForm(bill)" 
+                        title="代入上方表單重新測算"
+                        class="p-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition active:scale-95"
+                      >
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                      </button>
+                      <button 
+                        @click="deleteLedgerBill(bill.id)" 
+                        title="自清冊移除"
+                        class="p-1 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition active:scale-95"
+                      >
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr v-if="!filteredBillsLedger || filteredBillsLedger.length === 0">
+                  <td colspan="10" class="text-center py-12 text-slate-400">
+                    <i data-lucide="file-question" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+                    <p class="font-medium">尚無電費單帳冊紀錄</p>
+                    <p class="text-[11px] text-slate-400 mt-1">請於上方拖曳上傳客戶電費單 (PDF 或 照片)，系統將極速辨識並自動為您留存入庫。</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -1557,6 +1749,67 @@
           <button @click="showSupabaseModal = false" class="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium border border-slate-300 transition">
             關閉
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: 原始電費單線上預覽 Modal -->
+    <div v-if="isPreviewingBill && previewBillRecord" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white border border-[#CBD5E1] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70 rounded-t-2xl">
+          <div class="flex items-center space-x-2">
+            <span class="p-1.5 rounded-lg bg-blue-100 text-[#005A9C]">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <h3 class="text-sm font-bold text-[#051C2C]">
+                {{ previewBillRecord.customerName }} · 原始電費單留存檔案
+              </h3>
+              <p class="text-[11px] text-slate-500 font-mono">
+                電號：{{ previewBillRecord.custNumber }} | 饋線：{{ previewBillRecord.feederCode }} ({{ previewBillRecord.substation }}) | 檔名：{{ previewBillRecord.fileName }}
+              </p>
+            </div>
+          </div>
+          <button @click="closeBillPreview" class="text-slate-400 hover:text-slate-700">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4 flex-1 overflow-auto bg-slate-100/60 flex items-center justify-center min-h-[420px]">
+          <iframe 
+            v-if="previewBillBlobUrl && (previewBillRecord.fileType === 'application/pdf' || (previewBillRecord.fileName && previewBillRecord.fileName.toLowerCase().endsWith('.pdf')))"
+            :src="previewBillBlobUrl" 
+            class="w-full h-[68vh] border border-slate-200 rounded-xl shadow-inner bg-white"
+          ></iframe>
+          <img 
+            v-else-if="previewBillBlobUrl"
+            :src="previewBillBlobUrl" 
+            class="max-h-[68vh] max-w-full rounded-xl shadow-md object-contain border border-slate-200 bg-white"
+          />
+          <div v-else class="text-center py-12 text-slate-500">
+            <i data-lucide="file-warning" class="w-10 h-10 mx-auto text-amber-500 mb-2"></i>
+            <p class="font-semibold">未檢出二進位原始檔案 (可能以示範模式建立)</p>
+            <p class="text-xs text-slate-400 mt-1">電號：{{ previewBillRecord.custNumber }} | 契約容量：{{ previewBillRecord.contractKw }} kW | 地址：{{ previewBillRecord.address }}</p>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50/50 rounded-b-2xl">
+          <span class="text-xs text-slate-500">檔案永久離線持久化於瀏覽器 IndexedDB 本地存儲庫</span>
+          <div class="flex items-center space-x-2">
+            <button 
+              @click="downloadLedgerBill(previewBillRecord)" 
+              class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5"
+            >
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span>下載檔案</span>
+            </button>
+            <button 
+              @click="closeBillPreview" 
+              class="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium border border-slate-300 transition"
+            >
+              關閉
+            </button>
+          </div>
         </div>
       </div>
     </div>
