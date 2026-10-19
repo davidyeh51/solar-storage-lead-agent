@@ -51,6 +51,8 @@
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
   </script>
+  <!-- Tesseract.js (瀏覽器端 OCR 文字辨識引擎) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- Custom CSS -->
   <link rel="stylesheet" href="./static/style.css">
   <!-- Proj4 (台電坐標投影轉換) -->
@@ -1040,32 +1042,95 @@
                   <i data-lucide="file-spreadsheet" class="w-4 h-4 text-[#005A9C]"></i>
                   客戶電費單快速同步輸入
                 </h3>
-                <span class="text-[11px] text-slate-400">支援 9~11 碼台電圖號座標</span>
+                <span class="text-[11px] text-slate-400">支援 4 碼饋線代號 / 9~11 碼圖號 / 地址</span>
+              </div>
+
+              <!-- 電費單智慧辨識上傳區 (支援 PDF / 圖片拖曳或 Ctrl+V 貼上截圖 / 1-click 示範電費單) -->
+              <div class="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-slate-50 border-2 border-dashed border-[#005A9C]/40 hover:border-[#005A9C] transition space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-[#005A9C] text-white flex items-center justify-center shadow-sm">
+                      <i data-lucide="scan-line" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                      <h4 class="text-xs font-bold text-[#051C2C]">上傳客戶電費單 · AI 自動辨識並直出饋線結果</h4>
+                      <p class="text-[10px] text-slate-500">支援台電電子帳單 PDF、拍照圖檔、拖曳檔案或按 <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded font-mono text-[9px]">Ctrl+V</kbd> 貼上截圖</p>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    ⚡ 辨識完成自動即時測算
+                  </span>
+                </div>
+
+                <!-- 上傳觸發區 -->
+                <input 
+                  type="file" 
+                  ref="billFileInputRef" 
+                  accept=".pdf,image/png,image/jpeg,image/webp" 
+                  class="hidden" 
+                  @change="handleBillFileSelect">
+                <div 
+                  @dragover.prevent="isBillDragging = true"
+                  @dragleave.prevent="isBillDragging = false"
+                  @drop.prevent="handleBillFileDrop"
+                  @click="$refs.billFileInputRef.click()"
+                  :class="isBillDragging ? 'border-[#005A9C] bg-blue-50/70' : 'border-slate-200 hover:border-[#005A9C] bg-white/80 hover:bg-white'"
+                  class="rounded-xl p-4 border border-dashed cursor-pointer text-center transition flex flex-col items-center justify-center space-y-1 group"
+                >
+                  <div class="flex items-center gap-2 text-xs font-bold text-[#005A9C] group-hover:scale-105 transition">
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                    <span>{{ isParsingBillFile ? 'AI 正在極速辨識電費單文字並查詢饋線中...' : '點擊上傳電費單，或將 PDF / 圖檔拖曳至此 (亦可直接 Ctrl+V 貼上)' }}</span>
+                  </div>
+                  <p class="text-[10px] text-slate-400">自動萃取：戶名、電號(11碼)、圖號坐標/饋線代號、契約容量(kW)、地址</p>
+                </div>
+
+                <!-- 1-Click 示範電費單快速代入按鈕 -->
+                <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-blue-100 text-xs">
+                  <span class="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                    快速示範電費單 (1-Click 直出)：
+                  </span>
+                  <button 
+                    @click="loadSampleBill('runtai')"
+                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-blue-200 text-[#005A9C] text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
+                  >
+                    <span>🏢 潤泰精密里港廠 (NX23 / 600 kW / 屏東里港)</span>
+                  </button>
+                  <button 
+                    @click="loadSampleBill('innolux')"
+                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-blue-200 text-[#005A9C] text-[11px] font-semibold transition active:scale-95 shadow-2xs flex items-center gap-1"
+                  >
+                    <span>🏭 群創光電七股廠 (KN16 / 1500 kW / 台南七股)</span>
+                  </button>
+                </div>
               </div>
 
               <!-- 表單輸入區 -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-700 mb-1">客戶 / 案場名稱</label>
-                  <input v-model="billCustName" type="text" placeholder="例如：日月光半導體K28廠" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:border-[#005A9C]">
+                  <input v-model="billCustName" type="text" placeholder="例如：潤泰精密里港廠" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:border-[#005A9C]">
                 </div>
                 <div>
-                  <label class="block text-[11px] font-semibold text-slate-700 mb-1">台電電號 (11 碼)</label>
-                  <input v-model="billCustNo" type="text" placeholder="05-12-3456-78-9" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:outline-none focus:border-[#005A9C]">
+                  <label class="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center">
+                    <span>台電電號 (11 碼)</span>
+                    <span v-if="billCustNo && billCustNo.replace(/[-\s]/g, '').length === 11" class="text-[10px] text-emerald-600 font-medium ml-1.5 inline-block">✔ 11碼格式有效</span>
+                  </label>
+                  <input v-model="billCustNo" type="text" placeholder="例如：12-88-3474-21-5" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:outline-none focus:border-[#005A9C]">
                 </div>
                 <div>
-                  <label class="block text-[11px] font-semibold text-slate-700 mb-1">圖號坐標 (電桿/變壓器圖號)</label>
+                  <label class="block text-[11px] font-semibold text-slate-700 mb-1">饋線代號 / 圖號坐標</label>
                   <div class="flex space-x-1.5">
-                    <input v-model="billPoleCode" type="text" placeholder="例如：E1234AB56" class="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono uppercase font-bold text-[#005A9C] focus:bg-white focus:outline-none focus:border-[#005A9C]">
+                    <input v-model="billPoleCode" type="text" placeholder="例如：NX23 或 E1234AB56" class="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono uppercase font-bold text-[#005A9C] focus:bg-white focus:outline-none focus:border-[#005A9C]">
                   </div>
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-700 mb-1">契約容量 (kW)</label>
-                  <input v-model="billContractKw" type="number" placeholder="500" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:outline-none focus:border-[#005A9C]">
+                  <input v-model="billContractKw" type="number" placeholder="600" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:outline-none focus:border-[#005A9C]">
                 </div>
                 <div class="md:col-span-2">
                   <label class="block text-[11px] font-semibold text-slate-700 mb-1">用電地址 (或地號)</label>
-                  <input v-model="billAddress" type="text" placeholder="例如：台南市七股區三股里..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:border-[#005A9C]">
+                  <input v-model="billAddress" type="text" placeholder="例如：屏東縣里港鄉中南1之7號" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:border-[#005A9C]">
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-700 mb-1">擬規劃光電 (kWp)</label>
@@ -1080,10 +1145,13 @@
               <!-- 快速示範填入按鈕 -->
               <div class="flex items-center space-x-2 text-[11px] text-slate-500 pt-1">
                 <span>示範帶入：</span>
-                <button @click="billCustName='台南七股水產加工廠'; billCustNo='05-18-2345-67-1'; billPoleCode='Q5050AA11'; billContractKw=800; billTargetSolar=600; billTargetEss=1000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono">
-                  七股水產 (Q5050AA11)
+                <button @click="loadSampleBill('runtai')" class="px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-[#005A9C] font-mono font-bold">
+                  潤泰里港 (NX23)
                 </button>
-                <button @click="billCustName='彰化精密機械園區新廠'; billCustNo='04-12-9876-54-3'; billPoleCode='K5050AA11'; billContractKw=1500; billTargetSolar=1200; billTargetEss=2000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono">
+                <button @click="loadSampleBill('innolux')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono">
+                  七股群創 (KN16)
+                </button>
+                <button @click="billCustName='彰化精密機械園區新廠'; billCustNo='04-12-9876-54-3'; billPoleCode='K5050AA11'; billContractKw=1500; billTargetSolar=1200; billTargetEss=2000; queryBillFeeder()" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono">
                   彰化新廠 (K5050AA11)
                 </button>
               </div>
