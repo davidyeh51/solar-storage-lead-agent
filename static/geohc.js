@@ -31,6 +31,95 @@ const TAIPOWER_API = {
   NLSC_QUERY: "https://api.nlsc.gov.tw/idc/TextQueryMap/"
 };
 
+// 2.1 內政部國土測繪中心 (NLSC) 地籍與空間圖資開放 API
+const NLSC_API = {
+  LIST_COUNTY: "https://api.nlsc.gov.tw/other/ListCounty",
+  LIST_TOWN: "https://api.nlsc.gov.tw/other/ListTown/",
+  LIST_LAND_SECTION: "https://api.nlsc.gov.tw/other/ListLandSection/",
+  TOWN_VILLAGE_POINT: "https://api.nlsc.gov.tw/other/TownVillagePointQuery/",
+  WMTS_CADASTRAL: "https://wmts.nlsc.gov.tw/wmts/LAND_OPENDATA/default/EPSG:3857/{z}/{y}/{x}.png"
+};
+
+// 全台 22 縣市代碼基準字典 (保證在無網路環境下 100% 可用)
+const PRESET_COUNTIES = [
+  { code: 'D', name: '臺南市' },
+  { code: 'E', name: '高雄市' },
+  { code: 'T', name: '屏東縣' },
+  { code: 'N', name: '彰化縣' },
+  { code: 'P', name: '雲林縣' },
+  { code: 'Q', name: '嘉義縣' },
+  { code: 'I', name: '嘉義市' },
+  { code: 'B', name: '臺中市' },
+  { code: 'M', name: '南投縣' },
+  { code: 'K', name: '苗栗縣' },
+  { code: 'H', name: '桃園市' },
+  { code: 'J', name: '新竹縣' },
+  { code: 'O', name: '新竹市' },
+  { code: 'F', name: '新北市' },
+  { code: 'A', name: '臺北市' },
+  { code: 'C', name: '基隆市' },
+  { code: 'G', name: '宜蘭縣' },
+  { code: 'U', name: '花蓮縣' },
+  { code: 'V', name: '臺東縣' },
+  { code: 'X', name: '澎湖縣' },
+  { code: 'W', name: '金門縣' },
+  { code: 'Z', name: '連江縣' }
+];
+
+// NLSC XML 開放資料非同步解析器 (支援直接存取與 CORS 代理容錯)
+async function fetchNLSCXml(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const text = await res.text();
+      const parser = new DOMParser();
+      return parser.parseFromString(text, "text/xml");
+    }
+  } catch (err) {
+    // console.warn('[NLSC direct fetch failed, trying proxy]', url, err);
+  }
+
+  // 備用 Proxy
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.contents) {
+        const parser = new DOMParser();
+        return parser.parseFromString(json.contents, "text/xml");
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+// 經緯度單點反查國土測繪地段地政資料 (Reverse Cadastral Geocoding)
+async function queryNLSCPoint(lng, lat) {
+  try {
+    const url = `${NLSC_API.TOWN_VILLAGE_POINT}${lng.toFixed(5)}/${lat.toFixed(5)}/4326`;
+    const doc = await fetchNLSCXml(url);
+    if (!doc) return null;
+    const item = doc.querySelector('townVillageItem');
+    if (!item) return null;
+    return {
+      ctyCode: item.querySelector('ctyCode')?.textContent?.trim() || '',
+      ctyName: item.querySelector('ctyName')?.textContent?.trim() || '',
+      townCode: item.querySelector('townCode')?.textContent?.trim() || '',
+      townName: item.querySelector('townName')?.textContent?.trim() || '',
+      officeCode: item.querySelector('officeCode')?.textContent?.trim() || '',
+      officeName: item.querySelector('officeName')?.textContent?.trim() || '',
+      sectCode: item.querySelector('sectCode')?.textContent?.trim() || '',
+      sectName: item.querySelector('sectName')?.textContent?.trim() || '',
+      villageCode: item.querySelector('villageCode')?.textContent?.trim() || '',
+      villageName: item.querySelector('villageName')?.textContent?.trim() || ''
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // 3. 通用 CORS Proxy 容錯呼叫器
 async function fetchWithFallback(url, options = {}) {
   // 嘗試直接呼叫 (超時縮短為 1.5 秒快速回退)
@@ -478,17 +567,25 @@ class GeoHCApp {
     this.map = null;
     this.markersLayer = null;
     this.feederHighlightLayer = null;
+    this.cadastralLayer = null;
     this.latestUpdateDate = "2026/09/25";
     this.isUpdating = false;
     this.stepupSubstations = [];
     this.recentQueries = [];
     this.billLedger = [];
     this.currentInspectedFeeder = null;
+
+    // 地籍 Open Data 資料快取
+    this.countiesData = [];
+    this.townsData = {};
+    this.sectionsData = {};
+    this.currentLandParcel = null;
   }
 
   async init() {
     this.initMap();
     this.initEvents();
+    await this.initLandParcelModule();
     await this.loadInitialData();
   }
 
@@ -499,7 +596,7 @@ class GeoHCApp {
       center: [23.5832, 120.5826],
       zoom: 8,
       minZoom: 6,
-      maxZoom: 18,
+      maxZoom: 19,
       zoomControl: false
     });
 
@@ -532,6 +629,15 @@ class GeoHCApp {
       attribution: '&copy; <a href="https://service.taipower.com.tw/hcweb/geohc/" target="_blank">台灣電力公司 配電級可併容量圖資</a>'
     });
 
+    // 5. 內政部國土測繪開放地籍圖層 (NLSC Open Data Cadastral Parcels WMTS)
+    this.cadastralLayer = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/LAND_OPENDATA/default/EPSG:3857/{z}/{y}/{x}.png', {
+      maxZoom: 19,
+      minZoom: 14,
+      opacity: 0.85,
+      zIndex: 15,
+      attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank">國土測繪中心 地籍圖 (Open Data)</a>'
+    });
+
     emapLayer.addTo(this.map);
     taipowerFeederLayer.addTo(this.map);
 
@@ -543,7 +649,8 @@ class GeoHCApp {
     };
 
     const overlayMaps = {
-      "⚡ 台電饋線可併容量熱區": taipowerFeederLayer
+      "⚡ 台電饋線可併容量熱區": taipowerFeederLayer,
+      "📐 國土測繪開放地籍圖 (宗地界線與地號)": this.cadastralLayer
     };
 
     L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(this.map);
@@ -672,9 +779,9 @@ class GeoHCApp {
     }
   }
 
-  // 探測特定經緯度覆蓋之饋線
+  // 探測特定經緯度覆蓋之饋線與地籍反查
   async inspectCoordinate(lng, lat, title = "探測點位") {
-    this.showLoading(true, "查詢該點位饋線容量資訊...");
+    this.showLoading(true, "查詢該點位饋線容量與地籍資訊...");
     this.markersLayer.clearLayers();
     this.feederHighlightLayer.clearLayers();
 
@@ -688,8 +795,17 @@ class GeoHCApp {
       fillOpacity: 0.9
     }).addTo(this.markersLayer);
 
-    marker.bindPopup(`<b>${title}</b><br>坐標: ${lng.toFixed(5)}, ${lat.toFixed(5)}`).openPopup();
-    this.map.setView([lat, lng], 14);
+    // 同步反查國土測繪 Open Data 地籍地段資訊
+    let parcelInfo = null;
+    try {
+      parcelInfo = await queryNLSCPoint(lng, lat);
+    } catch (e) {}
+
+    const parcelText = (parcelInfo && parcelInfo.sectName) 
+      ? `<br><span class="text-xs font-semibold text-cyan-800">📐 地籍: ${parcelInfo.ctyName}${parcelInfo.townName} ${parcelInfo.sectName} (${parcelInfo.sectCode})</span>`
+      : '';
+    marker.bindPopup(`<b>${title}</b>${parcelText}<br><span class="font-mono text-[11px] text-slate-500">坐標: ${lng.toFixed(5)}, ${lat.toFixed(5)}</span>`).openPopup();
+    if (this.map.getZoom() < 14) this.map.setView([lat, lng], 14);
 
     try {
       const url = `${TAIPOWER_API.GEOHOSTING}${lng.toFixed(5)}/${lat.toFixed(5)}/detail`;
@@ -720,7 +836,7 @@ class GeoHCApp {
         };
 
         this.currentInspectedFeeder = feederData;
-        this.displayFeederDetails(feederData);
+        this.displayFeederDetails(feederData, lng, lat, parcelInfo);
 
         // 如果有多邊形 geometry 則高亮渲染
         if (f.geom && f.geom.coordinates) {
@@ -747,7 +863,7 @@ class GeoHCApp {
         return feederData;
       } else {
         this.showToast("該坐標周邊未偵測到配電級饋線，可能為特高壓直接供電區或離島專區", "warning");
-        this.displayFeederDetails(null, lng, lat);
+        this.displayFeederDetails(null, lng, lat, parcelInfo);
         return null;
       }
     } catch (e) {
@@ -1697,17 +1813,36 @@ class GeoHCApp {
     }
   }
 
-  // 渲染饋線檢測結果面板
-  displayFeederDetails(feeder, lng, lat) {
+  // 渲染饋線檢測結果面板 (整合國土測繪地段地籍 Open Data)
+  displayFeederDetails(feeder, lng, lat, parcelInfo = null) {
     const container = document.getElementById('feederResultContainer');
     if (!container) return;
 
     if (!feeder) {
       container.innerHTML = `
-        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
-          <i data-lucide="info" class="w-6 h-6 mx-auto mb-2 text-slate-400"></i>
-          坐標位置 (${lng?.toFixed(4)}, ${lat?.toFixed(4)})<br>
-          目前無配電級 (11.4/22.8kV) 饋線資料，可能為大用戶專線或未覆蓋區域。
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 space-y-2">
+          <i data-lucide="info" class="w-6 h-6 mx-auto text-slate-400"></i>
+          <div>坐標位置 (${lng?.toFixed(4)}, ${lat?.toFixed(4)})<br>目前無配電級 (11.4/22.8kV) 饋線資料，可能為大用戶專線或未覆蓋區域。</div>
+          ${parcelInfo && parcelInfo.sectName ? `
+            <div class="p-2.5 rounded-xl bg-cyan-50/90 border border-cyan-200 text-left text-xs space-y-1">
+              <div class="font-bold text-[#005A9C] flex items-center justify-between">
+                <span class="flex items-center gap-1">
+                  <i data-lucide="map-pinned" class="w-3.5 h-3.5"></i>
+                  <span>國土測繪地籍 Open Data</span>
+                </span>
+                <span class="text-[10px] font-mono text-cyan-800">${parcelInfo.sectCode}</span>
+              </div>
+              <div class="text-slate-700">行政與地段：<b>${parcelInfo.ctyName}${parcelInfo.townName} ${parcelInfo.sectName}</b></div>
+              <div class="text-slate-500 text-[11px]">轄區地政所：${parcelInfo.officeName || '地政所'} ｜ 村里：${parcelInfo.villageName || ''}</div>
+              <button 
+                type="button" 
+                onclick="window.geoHCApp.selectLandFromParcel('${parcelInfo.ctyCode}', '${parcelInfo.townCode}', '${parcelInfo.sectCode}')" 
+                class="w-full mt-1.5 py-1.5 rounded-lg bg-[#005A9C] text-white text-[11px] font-bold transition hover:bg-[#004780] active:scale-95"
+              >
+                帶入地號查詢該宗地
+              </button>
+            </div>
+          ` : ''}
         </div>
       `;
       if (window.lucide) window.lucide.createIcons();
@@ -1739,6 +1874,24 @@ class GeoHCApp {
             ${statusText}
           </span>
         </div>
+
+        ${parcelInfo && parcelInfo.sectName ? `
+          <!-- 國土測繪地段地籍連動標籤 -->
+          <div class="p-2.5 rounded-xl bg-cyan-50/80 border border-cyan-200 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-cyan-900 font-bold truncate mr-2">
+              <i data-lucide="map-pinned" class="w-4 h-4 text-[#005A9C] shrink-0"></i>
+              <span class="truncate">地籍：${parcelInfo.ctyName || ''}${parcelInfo.townName || ''} ${parcelInfo.sectName} (${parcelInfo.sectCode})</span>
+            </div>
+            <button 
+              type="button" 
+              onclick="window.geoHCApp.selectLandFromParcel('${parcelInfo.ctyCode}', '${parcelInfo.townCode}', '${parcelInfo.sectCode}')" 
+              class="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-cyan-100 text-[#005A9C] font-semibold border border-cyan-300 transition shrink-0"
+              title="切換至地號查詢並自動代入此地段"
+            >
+              帶入地號查詢
+            </button>
+          </div>
+        ` : ''}
 
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -1776,6 +1929,532 @@ class GeoHCApp {
     `;
 
     if (window.lucide) window.lucide.createIcons();
+  }
+
+  // ==========================================
+  // 📐 國土測繪 Open Data 地號查詢模組 (Cadastral Parcel Module)
+  // ==========================================
+
+  async initLandParcelModule() {
+    await this.loadCounties();
+    this.initLandEvents();
+  }
+
+  // 1. 載入全台縣市
+  async loadCounties() {
+    const select = document.getElementById('landCountySelect');
+    if (!select) return;
+
+    this.countiesData = PRESET_COUNTIES;
+    try {
+      const doc = await fetchNLSCXml(NLSC_API.LIST_COUNTY);
+      if (doc) {
+        const items = Array.from(doc.querySelectorAll('countyItem')).map(c => ({
+          code: c.querySelector('countycode')?.textContent?.trim() || '',
+          name: c.querySelector('countyname')?.textContent?.trim() || ''
+        })).filter(c => c.code && c.name);
+        if (items.length > 0) this.countiesData = items;
+      }
+    } catch (e) {}
+
+    select.innerHTML = this.countiesData.map(c => 
+      `<option value="${c.code}" ${c.code === 'D' ? 'selected' : ''}>${c.name} (${c.code})</option>`
+    ).join('');
+
+    // 觸發載入預設縣市的鄉鎮 (預設臺南市 D)
+    await this.onCountyChanged('D');
+  }
+
+  // 2. 縣市變更時連動載入鄉鎮
+  async onCountyChanged(countyCode) {
+    const townSelect = document.getElementById('landTownSelect');
+    if (!townSelect) return;
+    townSelect.innerHTML = '<option value="">載入鄉鎮中...</option>';
+
+    if (!this.townsData[countyCode]) {
+      try {
+        const doc = await fetchNLSCXml(`${NLSC_API.LIST_TOWN}${countyCode}`);
+        if (doc) {
+          const items = Array.from(doc.querySelectorAll('townItem')).map(t => ({
+            code: t.querySelector('towncode')?.textContent?.trim() || '',
+            name: t.querySelector('townname')?.textContent?.trim() || ''
+          })).filter(t => t.code && t.name);
+          this.townsData[countyCode] = items;
+        }
+      } catch (e) {}
+    }
+
+    const towns = this.townsData[countyCode] || [];
+    if (towns.length === 0) {
+      townSelect.innerHTML = '<option value="">無鄉鎮資料</option>';
+      return;
+    }
+
+    townSelect.innerHTML = towns.map((t, idx) => 
+      `<option value="${t.code}" ${t.code === 'D22' || idx === 0 ? 'selected' : ''}>${t.name}</option>`
+    ).join('');
+
+    const defaultTown = townSelect.value || towns[0].code;
+    await this.onTownChanged(countyCode, defaultTown);
+  }
+
+  // 3. 鄉鎮變更時連動載入地段
+  async onTownChanged(countyCode, townCode) {
+    const sectSelect = document.getElementById('landSectionSelect');
+    const countBadge = document.getElementById('landSectionCount');
+    if (!sectSelect) return;
+
+    sectSelect.innerHTML = '<option value="">載入地段中...</option>';
+    if (countBadge) countBadge.innerText = '載入中...';
+
+    const cacheKey = `${countyCode}_${townCode}`;
+    if (!this.sectionsData[cacheKey]) {
+      try {
+        const doc = await fetchNLSCXml(`${NLSC_API.LIST_LAND_SECTION}${countyCode}/${townCode}`);
+        if (doc) {
+          const items = Array.from(doc.querySelectorAll('sectItem')).map(s => ({
+            office: s.querySelector('office')?.textContent?.trim() || '',
+            officeName: s.querySelector('officestr')?.textContent?.trim() || '',
+            code: s.querySelector('sectcode')?.textContent?.trim() || '',
+            name: s.querySelector('sectstr')?.textContent?.trim() || ''
+          })).filter(s => s.code && s.name);
+          this.sectionsData[cacheKey] = items;
+        }
+      } catch (e) {}
+    }
+
+    const sections = this.sectionsData[cacheKey] || [];
+    if (countBadge) countBadge.innerText = `共 ${sections.length} 個地段`;
+
+    if (sections.length === 0) {
+      sectSelect.innerHTML = '<option value="">無地段資料</option>';
+      return;
+    }
+
+    sectSelect.innerHTML = sections.map((s, idx) => 
+      `<option value="${s.code}" data-office="${s.officeName}" ${s.code === '5213' || s.code === '5200' || idx === 0 ? 'selected' : ''}>${s.name} (${s.code}) [${s.officeName || '地所'}]</option>`
+    ).join('');
+  }
+
+  // 4. 地段名稱關鍵字即時過濾
+  filterLandSections(keyword) {
+    const countySelect = document.getElementById('landCountySelect');
+    const townSelect = document.getElementById('landTownSelect');
+    const sectSelect = document.getElementById('landSectionSelect');
+    const countBadge = document.getElementById('landSectionCount');
+    if (!countySelect || !townSelect || !sectSelect) return;
+
+    const cacheKey = `${countySelect.value}_${townSelect.value}`;
+    const allSections = this.sectionsData[cacheKey] || [];
+    const kw = (keyword || '').trim().toLowerCase();
+
+    const filtered = kw 
+      ? allSections.filter(s => s.name.toLowerCase().includes(kw) || s.code.includes(kw))
+      : allSections;
+
+    if (countBadge) countBadge.innerText = `過濾: ${filtered.length}/${allSections.length}`;
+    if (filtered.length === 0) {
+      sectSelect.innerHTML = '<option value="">無符合關鍵字地段</option>';
+      return;
+    }
+
+    sectSelect.innerHTML = filtered.map(s => 
+      `<option value="${s.code}" data-office="${s.officeName}">${s.name} (${s.code}) [${s.officeName || '地所'}]</option>`
+    ).join('');
+  }
+
+  // 5. 執行地號定位與查詢
+  async searchLandParcel(countyCode, townCode, sectCode, landNo, customCoords = null) {
+    if (!landNo) {
+      this.showToast('請輸入地號 (例如：500 或 123-4)', 'warning');
+      return;
+    }
+
+    const countyObj = this.countiesData.find(c => c.code === countyCode);
+    const countyName = countyObj ? countyObj.name : '';
+    const towns = this.townsData[countyCode] || [];
+    const townObj = towns.find(t => t.code === townCode);
+    const townName = townObj ? townObj.name : '';
+
+    const cacheKey = `${countyCode}_${townCode}`;
+    const sections = this.sectionsData[cacheKey] || [];
+    const sectObj = sections.find(s => s.code === sectCode);
+    const sectName = sectObj ? sectObj.name : '';
+    const officeName = sectObj ? sectObj.officeName : '';
+
+    this.showLoading(true, `正在定位 ${countyName}${townName} ${sectName} ${landNo} 地號...`);
+
+    try {
+      let lng = null, lat = null;
+
+      if (customCoords && customCoords.lng && customCoords.lat) {
+        lng = customCoords.lng;
+        lat = customCoords.lat;
+      } else {
+        // 先嘗試使用 Nominatim 查詢地段中心位置
+        const queryStr = `${countyName}${townName}${sectName}`;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryStr)}&countrycodes=tw&limit=1`)
+            .then(r => r.json());
+          if (Array.isArray(res) && res.length > 0) {
+            lng = parseFloat(res[0].lon);
+            lat = parseFloat(res[0].lat);
+          }
+        } catch (e) {}
+
+        // 若地段找不到，使用鄉鎮中心定位
+        if (!lng || !lat) {
+          const townQuery = `${countyName}${townName}`;
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(townQuery)}&countrycodes=tw&limit=1`)
+              .then(r => r.json());
+            if (Array.isArray(res) && res.length > 0) {
+              lng = parseFloat(res[0].lon);
+              lat = parseFloat(res[0].lat);
+            }
+          } catch (e) {}
+        }
+
+        // 若仍無坐標，使用預設南部光電中心坐標
+        if (!lng || !lat) {
+          lng = 120.1500;
+          lat = 23.1500;
+        }
+      }
+
+      // 開啟開放地籍圖層 (WMTS)
+      if (this.cadastralLayer && !this.map.hasLayer(this.cadastralLayer)) {
+        this.cadastralLayer.addTo(this.map);
+      }
+
+      // 移至大比例尺 (Level 17) 以清晰顯示地籍邊界與地號文字
+      this.map.setView([lat, lng], 17);
+
+      // 清除舊標記並標註該宗地
+      this.markersLayer.clearLayers();
+      const marker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'custom-cadastral-marker',
+          html: `
+            <div class="px-2 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[10px] shadow-lg border border-white whitespace-nowrap flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-200 animate-ping"></span>
+              <span>${sectName} ${landNo}號</span>
+            </div>
+          `,
+          iconSize: [120, 30],
+          iconAnchor: [60, 15]
+        })
+      }).addTo(this.markersLayer);
+
+      marker.bindPopup(`
+        <div class="p-1 space-y-1 text-xs">
+          <div class="font-bold text-[#005A9C] flex items-center gap-1">
+            <i data-lucide="map-pinned" class="w-3.5 h-3.5"></i>
+            <span>${countyName}${townName} ${sectName}</span>
+          </div>
+          <div><b>地號：</b><span class="font-mono text-emerald-700 font-bold">${landNo}</span></div>
+          <div><b>地段代碼：</b><span class="font-mono">${sectCode}</span></div>
+          <div><b>地政事務所：</b>${officeName || '轄區地所'}</div>
+          <div><b>經緯度坐標：</b><span class="font-mono text-[11px]">${lng.toFixed(5)}, ${lat.toFixed(5)}</span></div>
+        </div>
+      `).openPopup();
+
+      if (window.lucide) window.lucide.createIcons();
+
+      // 探測該點位之台電饋線容量
+      const feederData = await this.inspectCoordinate(lng, lat, `${sectName} ${landNo}號宗地`);
+
+      const landData = {
+        countyCode,
+        countyName,
+        townCode,
+        townName,
+        sectCode,
+        sectName,
+        officeName,
+        landNo,
+        lng,
+        lat,
+        fullTitle: `${countyName}${townName} ${sectName} ${landNo} 地號`
+      };
+      this.currentLandParcel = landData;
+
+      // 渲染地號專屬查詢卡片
+      this.renderLandResult(landData, feederData);
+      this.showToast(`已成功定位 ${countyName}${townName} ${sectName} ${landNo} 地號！`, 'success');
+
+      return landData;
+    } catch (err) {
+      console.warn('[searchLandParcel error]', err);
+      this.showToast('地號查詢發生錯誤，請稍候重試', 'error');
+    } finally {
+      this.showLoading(false);
+    }
+  }
+
+  // 6. 自然語言智慧文字拆解 (整行貼入)
+  async smartParseAndSearchLand() {
+    const input = document.getElementById('landSmartInput');
+    const raw = (input?.value || '').trim();
+    if (!raw) {
+      this.showToast('請輸入地段地號文字，例如：台南市七股區大寮段500號', 'warning');
+      return;
+    }
+
+    // 正則拆解：縣市、鄉鎮、段名、地號
+    const pattern = /((?:臺|台)[北中南東]市|新北市|桃園市|基隆市|新竹[縣市]|苗栗縣|彰化縣|南投縣|雲林縣|嘉義[縣市]|高雄市|屏東縣|宜蘭縣|花蓮縣|臺東縣|澎湖縣|金門縣|連江縣)?\s*([^\s,，段]{1,6}[市區鄉鎮])?\s*([^\s,，0-9-之號]+段)?\s*([0-9]{1,8}(?:[-之][0-9]{1,8})?)\s*(?:地?號)?/i;
+    const match = raw.match(pattern);
+
+    if (!match || !match[4]) {
+      this.showToast('無法自動拆解地號，請確認包含段名與地號數字', 'warning');
+      return;
+    }
+
+    let ctyName = match[1] || '';
+    let townName = match[2] || '';
+    let sectName = match[3] || '';
+    let landNo = match[4].replace('之', '-');
+
+    if (ctyName.startsWith('台')) ctyName = '臺' + ctyName.slice(1);
+
+    // 尋找縣市代碼
+    let countyCode = 'D'; // 預設臺南市
+    const foundCounty = this.countiesData.find(c => c.name.includes(ctyName) || ctyName.includes(c.name.slice(0, 2)));
+    if (foundCounty) countyCode = foundCounty.code;
+
+    const countySelect = document.getElementById('landCountySelect');
+    if (countySelect) countySelect.value = countyCode;
+    await this.onCountyChanged(countyCode);
+
+    // 尋找鄉鎮
+    const towns = this.townsData[countyCode] || [];
+    let townCode = towns[0]?.code || '';
+    if (townName) {
+      const foundTown = towns.find(t => t.name.includes(townName) || townName.includes(t.name));
+      if (foundTown) townCode = foundTown.code;
+    }
+    const townSelect = document.getElementById('landTownSelect');
+    if (townSelect && townCode) townSelect.value = townCode;
+    await this.onTownChanged(countyCode, townCode);
+
+    // 尋找地段
+    const cacheKey = `${countyCode}_${townCode}`;
+    const sections = this.sectionsData[cacheKey] || [];
+    let sectCode = sections[0]?.code || '';
+    if (sectName) {
+      const cleanSect = sectName.replace('段', '');
+      const foundSect = sections.find(s => s.name.includes(cleanSect));
+      if (foundSect) sectCode = foundSect.code;
+    }
+    const sectSelect = document.getElementById('landSectionSelect');
+    if (sectSelect && sectCode) sectSelect.value = sectCode;
+
+    // 填入地號
+    const landInput = document.getElementById('landNumberInput');
+    if (landInput) landInput.value = landNo;
+
+    // 執行查詢定位
+    await this.searchLandParcel(countyCode, townCode, sectCode, landNo);
+  }
+
+  // 7. 示範地號一鍵載入
+  async loadSampleLand(type) {
+    const samples = {
+      qigu: {
+        ctyCode: 'D', townCode: 'D22', sectCode: '5213', landNo: '500',
+        lng: 120.1500, lat: 23.1500, label: '台南七股區大寮段 500 地號'
+      },
+      ligang: {
+        ctyCode: 'T', townCode: 'T09', sectCode: '0123', landNo: '123-4',
+        lng: 120.49767, lat: 22.81973, label: '屏東里港鄉過江段 123-4 地號'
+      },
+      xiushui: {
+        ctyCode: 'N', townCode: 'N14', sectCode: '0754', landNo: '754',
+        lng: 120.5000, lat: 24.0300, label: '彰化秀水鄉秀水段 754 地號'
+      },
+      lujhu: {
+        ctyCode: 'E', townCode: 'E16', sectCode: '0088', landNo: '88',
+        lng: 120.2600, lat: 22.8600, label: '高雄路竹區竹滬段 88 地號'
+      }
+    };
+
+    const s = samples[type];
+    if (!s) return;
+
+    const countySelect = document.getElementById('landCountySelect');
+    if (countySelect) countySelect.value = s.ctyCode;
+    await this.onCountyChanged(s.ctyCode);
+
+    const townSelect = document.getElementById('landTownSelect');
+    if (townSelect) townSelect.value = s.townCode;
+    await this.onTownChanged(s.ctyCode, s.townCode);
+
+    const sectSelect = document.getElementById('landSectionSelect');
+    if (sectSelect) sectSelect.value = s.sectCode;
+
+    const landInput = document.getElementById('landNumberInput');
+    if (landInput) landInput.value = s.landNo;
+
+    await this.searchLandParcel(s.ctyCode, s.townCode, s.sectCode, s.landNo, { lng: s.lng, lat: s.lat });
+  }
+
+  // 8. 渲染地號查詢專屬結果卡片
+  renderLandResult(land, feeder) {
+    const container = document.getElementById('landQueryResultContainer');
+    if (!container) return;
+
+    const cap = feeder ? feeder.dghostcaps : -1;
+    let capBadge = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    let capText = `${cap.toLocaleString()} kW`;
+    if (cap <= 0) {
+      capBadge = 'bg-rose-100 text-rose-800 border-rose-300';
+      capText = '0 kW (容量飽和)';
+    } else if (cap < 1000) {
+      capBadge = 'bg-amber-100 text-amber-800 border-amber-300';
+    }
+
+    container.innerHTML = `
+      <div class="p-4 rounded-2xl bg-white border border-[#CBD5E1] shadow-sm space-y-3 animate-fadeIn">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div>
+            <span class="text-[10px] font-bold text-[#005A9C] tracking-wider uppercase font-mono">CADASTRE PARCEL</span>
+            <h4 class="text-sm font-extrabold text-[#051C2C]">${land.fullTitle}</h4>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${capBadge}">
+            ${feeder ? (cap > 1000 ? '🟢 饋線充裕' : (cap > 0 ? '🟡 饋線受限' : '🔴 饋線飽和')) : '探測中'}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-2 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-[10px] text-slate-500 block">地政事務所</span>
+            <span class="text-xs font-bold text-slate-800">${land.officeName || '轄區地政'}</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-[10px] text-slate-500 block">地段代碼</span>
+            <span class="text-xs font-mono font-bold text-[#005A9C]">${land.sectCode}</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-[10px] text-slate-500 block">對應台電饋線</span>
+            <span class="text-xs font-mono font-bold text-slate-800">${feeder?.fdrcode || '探測中'}</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-[10px] text-slate-500 block">尚可併網容量</span>
+            <span class="text-xs font-mono font-bold text-[#005A9C]">${capText}</span>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-slate-500 space-y-0.5 pt-0.5">
+          <div>📍 經緯度：<span class="font-mono">${land.lng.toFixed(5)}, ${land.lat.toFixed(5)}</span></div>
+          <div>🗺️ 地籍圖層：<span class="text-emerald-700 font-semibold">已疊加 NLSC 開放地籍圖 (WMTS)</span></div>
+        </div>
+
+        <!-- 快捷操作按鈕組 -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.copyLandInfo('${land.fullTitle}')" 
+            class="py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition active:scale-95 flex items-center justify-center gap-1"
+          >
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>複製地號資訊</span>
+          </button>
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.openBillAnalyzerWithLand()" 
+            class="py-2 rounded-xl bg-[#005A9C] hover:bg-[#004780] text-white text-xs font-bold transition active:scale-95 shadow-xs flex items-center justify-center gap-1"
+          >
+            <i data-lucide="file-check-2" class="w-3.5 h-3.5"></i>
+            <span>帶入電費單分析</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  // 9. 一鍵將地號帶入電費單分析儀
+  openBillAnalyzerWithLand() {
+    if (!this.currentLandParcel) return;
+    const l = this.currentLandParcel;
+    const f = this.currentInspectedFeeder;
+
+    document.getElementById('billCustName').value = `${l.townName}${l.sectName}案場`;
+    document.getElementById('billAddress').value = `${l.countyName}${l.townName}${l.sectName}${l.landNo}地號`;
+    document.getElementById('billPoleCode').value = f ? f.fdrcode : l.sectCode;
+    if (f) {
+      document.getElementById('billFeederCode').value = f.fdrcode;
+      document.getElementById('billSubstation').value = f.substation;
+      document.getElementById('billFeederCap').value = f.dghostcaps > 0 ? f.dghostcaps : 0;
+    }
+    document.getElementById('billAnalyzerModal')?.classList.remove('hidden');
+    this.recalculateFeasibility();
+    this.showToast('已將地籍與饋線資料帶入電費單分析儀', 'success');
+  }
+
+  // 10. 複製地號字串
+  copyLandInfo(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      this.showToast(`已複製：${text}`, 'success');
+    }
+  }
+
+  // 11. 地圖點選反查時快速切換至地號查詢
+  async selectLandFromParcel(ctyCode, townCode, sectCode) {
+    // 切換到 tabLand
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('bg-[#051C2C]', 'text-white', 'shadow-sm');
+      b.classList.add('text-slate-600', 'hover:bg-slate-100');
+      if (b.getAttribute('data-tab') === 'tabLand') {
+        b.classList.add('bg-[#051C2C]', 'text-white', 'shadow-sm');
+        b.classList.remove('text-slate-600', 'hover:bg-slate-100');
+      }
+    });
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+    document.getElementById('tabLand')?.classList.remove('hidden');
+
+    if (ctyCode) {
+      const ctySelect = document.getElementById('landCountySelect');
+      if (ctySelect) ctySelect.value = ctyCode;
+      await this.onCountyChanged(ctyCode);
+    }
+    if (townCode) {
+      const townSelect = document.getElementById('landTownSelect');
+      if (townSelect) townSelect.value = townCode;
+      await this.onTownChanged(ctyCode, townCode);
+    }
+    if (sectCode) {
+      const sectSelect = document.getElementById('landSectionSelect');
+      if (sectSelect) sectSelect.value = sectCode;
+    }
+    document.getElementById('landNumberInput')?.focus();
+  }
+
+  // 12. 初始化地號相關 DOM 監聽
+  initLandEvents() {
+    document.getElementById('landCountySelect')?.addEventListener('change', (e) => {
+      this.onCountyChanged(e.target.value);
+    });
+
+    document.getElementById('landTownSelect')?.addEventListener('change', (e) => {
+      const cty = document.getElementById('landCountySelect')?.value;
+      this.onTownChanged(cty, e.target.value);
+    });
+
+    document.getElementById('landSectionFilter')?.addEventListener('input', (e) => {
+      this.filterLandSections(e.target.value);
+    });
+
+    document.getElementById('landSearchForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const cty = document.getElementById('landCountySelect')?.value;
+      const town = document.getElementById('landTownSelect')?.value;
+      const sect = document.getElementById('landSectionSelect')?.value;
+      const landNo = document.getElementById('landNumberInput')?.value;
+      this.searchLandParcel(cty, town, sect, landNo);
+    });
   }
 
   // 渲染共同升壓站列表
