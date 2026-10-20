@@ -89,6 +89,12 @@
             <span>台電饋線地圖 (GeoHC)</span>
           </a>
 
+          <!-- 📑 地籍圖與台電公文資料庫按鈕 -->
+          <a href="cadastre-letters.html" target="_blank" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm transition active:scale-95" title="開啟地籍圖、地號與台電函文管理資料庫">
+            <i data-lucide="folder-check" class="w-3.5 h-3.5"></i>
+            <span>地籍公文資料庫</span>
+          </a>
+
           <!-- Supabase 狀態指示 -->
           <button @click="showSupabaseModal = true" class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer" :class="supabaseStatusClass">
             <span class="w-2 h-2 rounded-full" :class="supabaseDotClass"></span>

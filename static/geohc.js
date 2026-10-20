@@ -210,6 +210,19 @@ const KNOWN_FEEDERS = {
     tptel: '04-7622111',
     lng: 120.5000,
     lat: 24.0300
+  },
+  'JG74': {
+    fdrcode: 'JG74',
+    fdrname: 'JG74 號饋線',
+    substation: '三和變電所 (嘉義大林/大埔美)',
+    vlevel: '11.4KV / 22.8KV',
+    dghostcaps: 2884,
+    tpname: '台電嘉義區營業處',
+    tpaddr: '嘉義市垂楊路223號',
+    tptel: '05-2226711#2236',
+    lng: 120.52105,
+    lat: 23.59335,
+    remark: '大埔美精密機械園區二期/大工二段2地號專線，台電函文核准可併容量 2,884 kW 充裕 (綠燈)'
   }
 };
 
@@ -558,7 +571,219 @@ const BillStorageDB = {
   }
 };
 
+// 4.3 預設地籍與台電公文示範種子 (嘉義縣大林鎮大工二段2地號 - 台電嘉義字第1151265015號函)
+const DEFAULT_CADASTRE_LETTER = {
+  id: 'doc_1151265015',
+  doc_number: '嘉義字第1151265015號',
+  doc_date: '115年10月16日',
+  issuer: '台灣電力股份有限公司嘉義區營業處',
+  recipient: '進金生能源服務股份有限公司',
+  subject: '有關貴公司函詢「嘉義縣大林鎮大工二段2地號」供電饋線之太陽光電發電設備可併網容量一案，復如說明，請查照。',
+  county_code: 'Q',
+  county_name: '嘉義縣',
+  town_code: 'Q04',
+  town_name: '大林鎮',
+  section_code: '0630',
+  section_name: '大工二段',
+  land_no: '2',
+  full_land_title: '嘉義縣大林鎮大工二段2地號',
+  office_name: '大林地政事務所',
+  substation: '三和變電所',
+  feeder_code: 'JG74',
+  approved_capacity_kw: 2884,
+  capacity_status: '充裕可併',
+  policy_type: '不保留',
+  contact_person: '王瓏勳 (05-2226711#2236)',
+  contact_email: 'u439531@taipower.com.tw',
+  cadastral_map_url: './docs/cadastre_dalin_0630_2.png',
+  letter_file_name: '有關貴公司函詢「嘉義縣大林鎮大工二段2地號」供電饋 線之太陽光電發電設備可併網容量一案，復如說明，請查 照.pdf',
+  letter_file_size: '258.3 KB',
+  letter_file_url: './docs/嘉義縣大林鎮大工二段2地號_台電可併容量函_1151265015.pdf',
+  letter_content_summary: '建案地點位於嘉義區處轄管三和變電所JG74饋線供電範圍，確認目前尚有可設置2,884 kW之併網容量。容量採不保留機制，請妥適規劃併網審查時點。若後續送審容量不足，可辦理建照圖面免設/減設變更，或採自發自用不躉售+防逆流電驛。',
+  longitude: 120.52105,
+  latitude: 23.59335,
+  created_at: '2026-10-16T08:00:00Z'
+};
+
+// 4.4 地籍圖、地號與台電函文管理資料庫 (CadastreDocStorageDB - IndexedDB ✕ Supabase 雙軌持久化)
+const CadastreDocStorageDB = {
+  dbName: 'SolarCadastreLetterDB',
+  storeName: 'letters',
+  filesStoreName: 'letter_files',
+  version: 1,
+
+  async getDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(this.filesStoreName)) {
+          db.createObjectStore(this.filesStoreName, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  async saveLetter(doc, fileBlob = null) {
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction([this.storeName, this.filesStoreName], 'readwrite');
+      const metaStore = tx.objectStore(this.storeName);
+      const filesStore = tx.objectStore(this.filesStoreName);
+
+      const meta = { ...doc };
+      delete meta.fileBlob;
+      metaStore.put(meta);
+
+      if (fileBlob) {
+        filesStore.put({
+          id: doc.id,
+          fileName: doc.letter_file_name,
+          blob: fileBlob
+        });
+      }
+
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+
+      // 同步備份至 localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('solar_cadastre_letters') || '[]');
+        const updated = [meta, ...existing.filter(i => i.id !== meta.id)];
+        localStorage.setItem('solar_cadastre_letters', JSON.stringify(updated.slice(0, 100)));
+      } catch(e) {}
+
+      // 同步寫入 Supabase
+      if (window.supabaseManager) {
+        window.supabaseManager.upsertCadastreLetter(meta);
+      }
+
+      return meta;
+    } catch (err) {
+      console.warn('[CadastreDocStorageDB save error]:', err);
+      return doc;
+    }
+  },
+
+  async getAllLetters() {
+    // 1. 優先從 Supabase 取得最新雲端資料
+    if (window.supabaseManager) {
+      try {
+        const cloudDocs = await window.supabaseManager.getCadastreLetters();
+        if (cloudDocs && cloudDocs.length > 0) return cloudDocs;
+      } catch(e) {}
+    }
+
+    // 2. 本機 IndexedDB
+    try {
+      const db = await this.getDB();
+      const records = await new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readonly');
+        const req = tx.objectStore(this.storeName).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+      if (records && records.length > 0) return records;
+    } catch(e) {}
+
+    // 3. 本機 localStorage
+    try {
+      const local = JSON.parse(localStorage.getItem('solar_cadastre_letters') || '[]');
+      if (local && local.length > 0) return local;
+    } catch(e) {}
+
+    // 4. 預設示範種子資料
+    return [DEFAULT_CADASTRE_LETTER];
+  },
+
+  async getLetterFile(id) {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.filesStoreName, 'readonly');
+        const req = tx.objectStore(this.filesStoreName).get(id);
+        req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      return null;
+    }
+  },
+
+  exportToCSV(records) {
+    if (!records || records.length === 0) return;
+    const headers = [
+      '序號', '發文日期', '台電發文字號', '發文機關', '受文者', '完整地號名稱',
+      '縣市', '鄉鎮市區', '地段名稱', '段代碼', '地號', '轄區地政所',
+      '供電變電所', '供電饋線代號', '核定可併容量(kW)', '容量狀態', '保留機制',
+      '承辦聯絡人', '經度', '緯度', '公文重點摘要', '原始函文檔名'
+    ];
+
+    const rows = records.map((r, idx) => [
+      idx + 1,
+      `"${r.doc_date || ''}"`,
+      `"${r.doc_number || ''}"`,
+      `"${(r.issuer || '').replace(/"/g, '""')}"`,
+      `"${(r.recipient || '').replace(/"/g, '""')}"`,
+      `"${(r.full_land_title || '').replace(/"/g, '""')}"`,
+      `"${r.county_name || ''}"`,
+      `"${r.town_name || ''}"`,
+      `"${r.section_name || ''}"`,
+      `"${r.section_code || ''}"`,
+      `"${r.land_no || ''}"`,
+      `"${r.office_name || ''}"`,
+      `"${r.substation || ''}"`,
+      `"${r.feeder_code || ''}"`,
+      r.approved_capacity_kw || 0,
+      `"${r.capacity_status || '充裕可併'}"`,
+      `"${r.policy_type || '不保留'}"`,
+      `"${(r.contact_person || '').replace(/"/g, '""')}"`,
+      r.longitude || 0,
+      r.latitude || 0,
+      `"${(r.letter_content_summary || '').replace(/"/g, '""')}"`,
+      `"${(r.letter_file_name || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `台電地籍地號與函文資料庫_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async deleteLetter(id) {
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction([this.storeName, this.filesStoreName], 'readwrite');
+      tx.objectStore(this.storeName).delete(id);
+      tx.objectStore(this.filesStoreName).delete(id);
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+      const local = JSON.parse(localStorage.getItem('solar_cadastre_letters') || '[]');
+      localStorage.setItem('solar_cadastre_letters', JSON.stringify(local.filter(b => b.id !== id)));
+      if (window.supabaseManager) {
+        window.supabaseManager.deleteCadastreLetter(id);
+      }
+    } catch (e) {}
+  }
+};
+
 window.BillStorageDB = BillStorageDB;
+window.CadastreDocStorageDB = CadastreDocStorageDB;
 window.parseElectricityBillText = parseElectricityBillText;
 
 // 5. GeoHC 應用程式核心類別
@@ -573,6 +798,7 @@ class GeoHCApp {
     this.stepupSubstations = [];
     this.recentQueries = [];
     this.billLedger = [];
+    this.cadastreLetters = [];
     this.currentInspectedFeeder = null;
 
     // 地籍 Open Data 資料快取
@@ -586,6 +812,7 @@ class GeoHCApp {
     this.initMap();
     this.initEvents();
     await this.initLandParcelModule();
+    await this.loadCadastreLetters();
     await this.loadInitialData();
   }
 
@@ -684,6 +911,16 @@ class GeoHCApp {
 
       // 4. 載入電費單案場帳冊清冊 (IndexedDB + LocalStorage)
       await this.loadBillLedger();
+
+      // 5. 檢查 URL 參數自動導航 (例如 ?cadastre=doc_1151265015 或 ?sample=dalin)
+      const urlParams = new URLSearchParams(window.location.search);
+      const cadastreId = urlParams.get('cadastre');
+      const sample = urlParams.get('sample');
+      if (cadastreId) {
+        setTimeout(() => this.locateCadastreItem(cadastreId), 500);
+      } else if (sample) {
+        setTimeout(() => this.loadSampleLand(sample), 500);
+      }
     } catch (e) {
       console.warn('[Initial load warning]', e);
     } finally {
@@ -2275,6 +2512,10 @@ class GeoHCApp {
       lujhu: {
         ctyCode: 'E', townCode: 'E16', sectCode: '0088', landNo: '88',
         lng: 120.2600, lat: 22.8600, label: '高雄路竹區竹滬段 88 地號'
+      },
+      dalin: {
+        ctyCode: 'Q', townCode: 'Q04', sectCode: '0630', landNo: '2',
+        lng: 120.52105, lat: 23.59335, label: '嘉義縣大林鎮大工二段 2 地號 (台電函覆 2,884 kW)'
       }
     };
 
@@ -2455,6 +2696,374 @@ class GeoHCApp {
       const landNo = document.getElementById('landNumberInput')?.value;
       this.searchLandParcel(cty, town, sect, landNo);
     });
+  }
+
+  // ==========================================
+  // 📑 地籍圖、地號與台電函文資料庫管理系統
+  // ==========================================
+
+  // 1. 載入地籍與函文清單
+  async loadCadastreLetters() {
+    this.cadastreLetters = await CadastreDocStorageDB.getAllLetters();
+    const badge = document.getElementById('headerCadastreBadge');
+    if (badge) badge.innerText = this.cadastreLetters.length;
+    this.renderCadastreTable(this.cadastreLetters);
+    this.updateCadastreKpis();
+  }
+
+  // 2. 開啟函文資料庫全螢幕 Modal
+  openCadastreModal() {
+    const modal = document.getElementById('cadastreLettersModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      this.renderCadastreTable(this.cadastreLetters);
+      this.updateCadastreKpis();
+    }
+  }
+
+  // 3. 關閉函文資料庫 Modal
+  closeCadastreModal() {
+    document.getElementById('cadastreLettersModal')?.classList.add('hidden');
+  }
+
+  // 4. 更新 KPI 指標卡
+  updateCadastreKpis() {
+    const totalCount = this.cadastreLetters.length;
+    const totalKw = this.cadastreLetters.reduce((sum, item) => sum + (Number(item.approved_capacity_kw) || 0), 0);
+    const greenCount = this.cadastreLetters.filter(item => (Number(item.approved_capacity_kw) || 0) >= 1000).length;
+
+    const elTotal = document.getElementById('cadastreKpiTotal');
+    if (elTotal) elTotal.innerText = `${totalCount} 份`;
+
+    const elKw = document.getElementById('cadastreKpiKw');
+    if (elKw) elKw.innerText = `${totalKw.toLocaleString()} kW`;
+
+    const elGreen = document.getElementById('cadastreKpiGreen');
+    if (elGreen) elGreen.innerText = `${greenCount} 案`;
+  }
+
+  // 5. 渲染函文資料庫表格 (McKinsey High-Density Table)
+  renderCadastreTable(records = null) {
+    const tbody = document.getElementById('cadastreTableBody');
+    if (!tbody) return;
+
+    const list = records || this.cadastreLetters;
+    if (list.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center py-10 text-xs text-slate-400">
+            目前尚無地籍函文資料，請點擊右上角「上傳台電函文」新增。
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = list.map((doc, idx) => {
+      const cap = Number(doc.approved_capacity_kw) || 0;
+      let capBadge = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      if (cap <= 0) {
+        capBadge = 'bg-rose-100 text-rose-800 border-rose-300';
+      } else if (cap < 1000) {
+        capBadge = 'bg-amber-100 text-amber-800 border-amber-300';
+      }
+
+      return `
+        <tr class="hover:bg-slate-50/80 transition text-xs border-b border-slate-100">
+          <td class="px-3 py-3 text-center text-slate-400 font-mono text-[11px]">${idx + 1}</td>
+          <td class="px-3 py-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">${doc.doc_date || ''}</td>
+          <td class="px-3 py-3">
+            <div class="font-bold text-[#051C2C] font-mono">${doc.doc_number || ''}</div>
+            <div class="text-[10px] text-slate-400 truncate max-w-[200px]" title="${doc.issuer || ''}">${doc.issuer || '台電營業處'}</div>
+          </td>
+          <td class="px-3 py-3">
+            <div class="font-bold text-[#005A9C]">${doc.full_land_title || ''}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${doc.office_name || ''} ｜ 段號:${doc.section_code || ''}</div>
+          </td>
+          <td class="px-3 py-3 whitespace-nowrap">
+            <span class="font-bold font-mono text-slate-800">${doc.feeder_code || ''}</span>
+            <div class="text-[10px] text-slate-500">${doc.substation || ''}</div>
+          </td>
+          <td class="px-3 py-3 text-right whitespace-nowrap">
+            <span class="font-bold font-mono text-sm text-[#005A9C]">${cap.toLocaleString()} kW</span>
+            <span class="block text-[9px] text-slate-400">${doc.policy_type || '不保留'}</span>
+          </td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${capBadge}">
+              ${doc.capacity_status || (cap > 1000 ? '🟢 充裕可併' : '🟡 受限')}
+            </span>
+          </td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <button 
+              type="button" 
+              onclick="window.geoHCApp.previewCadastreMap('${doc.id}')" 
+              class="px-2 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-[11px] font-semibold border border-cyan-200 transition"
+              title="檢視 NLSC 開放地籍圖"
+            >
+              📐 地籍圖
+            </button>
+          </td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <div class="flex items-center justify-center space-x-1">
+              <button 
+                type="button" 
+                onclick="window.geoHCApp.previewCadastreFile('${doc.id}')" 
+                class="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#005A9C] text-[11px] font-semibold border border-blue-200 transition"
+                title="預覽原始公文函"
+              >
+                📄 函文 PDF
+              </button>
+            </div>
+          </td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <div class="flex items-center justify-center space-x-1.5">
+              <button 
+                type="button" 
+                onclick="window.geoHCApp.locateCadastreItem('${doc.id}')" 
+                class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition" 
+                title="於 GIS 地圖立即定位"
+              >
+                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+              </button>
+              <button 
+                type="button" 
+                onclick="window.geoHCApp.deleteCadastreItem('${doc.id}')" 
+                class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" 
+                title="刪除公文紀錄"
+              >
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  // 6. 搜尋與過濾函文表格
+  filterCadastreTable() {
+    const input = document.getElementById('cadastreSearchInput');
+    const kw = (input?.value || '').trim().toLowerCase();
+    if (!kw) {
+      this.renderCadastreTable(this.cadastreLetters);
+      return;
+    }
+
+    const filtered = this.cadastreLetters.filter(doc => 
+      (doc.doc_number || '').toLowerCase().includes(kw) ||
+      (doc.full_land_title || '').toLowerCase().includes(kw) ||
+      (doc.feeder_code || '').toLowerCase().includes(kw) ||
+      (doc.substation || '').toLowerCase().includes(kw) ||
+      (doc.issuer || '').toLowerCase().includes(kw)
+    );
+
+    this.renderCadastreTable(filtered);
+  }
+
+  // 7. 於地圖即時定位該地籍函文案場
+  async locateCadastreItem(id) {
+    const doc = this.cadastreLetters.find(d => d.id === id);
+    if (!doc) return;
+
+    this.closeCadastreModal();
+
+    // 切換至地號頁籤並載入地號
+    await this.selectLandFromParcel(doc.county_code, doc.town_code, doc.section_code);
+    const landInput = document.getElementById('landNumberInput');
+    if (landInput) landInput.value = doc.land_no;
+
+    if (doc.longitude && doc.latitude) {
+      await this.searchLandParcel(doc.county_code, doc.town_code, doc.section_code, doc.land_no, {
+        lng: Number(doc.longitude),
+        lat: Number(doc.latitude)
+      });
+    } else {
+      await this.searchLandParcel(doc.county_code, doc.town_code, doc.section_code, doc.land_no);
+    }
+  }
+
+  // 8. 預覽地籍圖
+  previewCadastreMap(id) {
+    const doc = this.cadastreLetters.find(d => d.id === id);
+    if (!doc) return;
+
+    const modal = document.getElementById('billPreviewModal');
+    const titleEl = document.getElementById('billPreviewTitle');
+    const contentEl = document.getElementById('billPreviewContent');
+    const dlBtn = document.getElementById('billPreviewDownloadBtn');
+    if (!modal || !contentEl) return;
+
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <span class="font-bold text-[#051C2C]">${doc.full_land_title} · 開放地籍圖</span>
+        <span class="text-xs text-slate-500 ml-2">段代碼: ${doc.section_code} ｜ 國土測繪 (NLSC) WMTS</span>
+      `;
+    }
+
+    const mapImg = doc.cadastral_map_url || `./docs/cadastre_dalin_0630_2.png`;
+    contentEl.innerHTML = `
+      <div class="h-full flex flex-col items-center justify-center p-4 bg-slate-900 rounded-xl min-h-[60vh]">
+        <img src="${mapImg}" class="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl border border-white/20" alt="地籍圖">
+        <p class="text-xs text-cyan-200 mt-3 font-mono">國土測繪圖資服務雲 (NLSC) 開放地籍圖 (WMTS)</p>
+      </div>
+    `;
+
+    if (dlBtn) {
+      dlBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = mapImg;
+        a.download = `地籍圖_${doc.full_land_title}.png`;
+        a.click();
+      };
+    }
+
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  // 9. 預覽台電公文原始 PDF
+  async previewCadastreFile(id) {
+    const doc = this.cadastreLetters.find(d => d.id === id);
+    if (!doc) return;
+
+    const modal = document.getElementById('billPreviewModal');
+    const titleEl = document.getElementById('billPreviewTitle');
+    const contentEl = document.getElementById('billPreviewContent');
+    const dlBtn = document.getElementById('billPreviewDownloadBtn');
+    if (!modal || !contentEl) return;
+
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <span class="font-bold text-[#051C2C]">${doc.doc_number}</span>
+        <span class="text-xs text-slate-500 ml-2">${doc.full_land_title} ｜ 供電饋線: ${doc.feeder_code} (${doc.approved_capacity_kw} kW)</span>
+      `;
+    }
+
+    const pdfUrl = doc.letter_file_url || `./docs/嘉義縣大林鎮大工二段2地號_台電可併容量函_1151265015.pdf`;
+
+    contentEl.innerHTML = `
+      <iframe src="${pdfUrl}#toolbar=1" class="w-full h-full min-h-[75vh] rounded-xl border border-slate-200 shadow-inner" frameborder="0"></iframe>
+    `;
+
+    if (dlBtn) {
+      dlBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = doc.letter_file_name || `${doc.doc_number}.pdf`;
+        a.click();
+      };
+    }
+
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  // 10. 刪除公文紀錄
+  async deleteCadastreItem(id) {
+    if (!confirm('確定要自雲端資料庫與本地儲存中刪除此份公文紀錄嗎？')) return;
+    await CadastreDocStorageDB.deleteLetter(id);
+    await this.loadCadastreLetters();
+    this.showToast('已成功刪除該筆公文紀錄', 'success');
+  }
+
+  // 11. 匯出 Excel / CSV
+  exportCadastreCSV() {
+    CadastreDocStorageDB.exportToCSV(this.cadastreLetters);
+    this.showToast(`已成功匯出 ${this.cadastreLetters.length} 筆地籍函文資料至 CSV 檔案！`, 'success');
+  }
+
+  // 12. 開啟上傳新函文彈窗
+  openAddCadastreModal() {
+    document.getElementById('addCadastreModal')?.classList.remove('hidden');
+  }
+
+  closeAddCadastreModal() {
+    document.getElementById('addCadastreModal')?.classList.add('hidden');
+  }
+
+  // 13. 解析並儲存新上傳的台電公文
+  async handleLetterPdfUpload(file) {
+    if (!file) return;
+    this.showLoading(true, `正在解析公文檔案：${file.name}...`);
+    try {
+      let extractedText = '';
+      if (file.type === 'application/pdf' && window.pdfjsLib) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          extractedText += textContent.items.map(item => item.str).join(' ') + '\n';
+        }
+      }
+
+      // 智慧萃取公文關鍵欄位
+      const docNoMatch = extractedText.match(/([^\s]+字第[0-9]+號)/);
+      const docDateMatch = extractedText.match(/(?:發文日期[：:\s]*)(中華民國[0-9]+年[0-9]+月[0-9]+日)/) || extractedText.match(/([0-9]+年[0-9]+月[0-9]+日)/);
+      const landMatch = extractedText.match(/(?:函詢[「"']?)([^\s"']+[市區鄉鎮][^\s"']+段[0-9]+(?:[-之][0-9]+)?地?號)/);
+      const feederMatch = extractedText.match(/([A-Z0-9]{3,6})(?:饋線)/);
+      const subMatch = extractedText.match(/([^\s]+變電所)/);
+      const capMatch = extractedText.match(/(?:可設置|容量)[：:\s]*([0-9,.]+)\s*(?:kW|瓩)?/i);
+
+      if (docNoMatch) document.getElementById('newDocNo').value = docNoMatch[1];
+      if (docDateMatch) document.getElementById('newDocDate').value = docDateMatch[1];
+      if (landMatch) document.getElementById('newDocLand').value = landMatch[1];
+      if (feederMatch) document.getElementById('newDocFeeder').value = feederMatch[1];
+      if (subMatch) document.getElementById('newDocSub').value = subMatch[1];
+      if (capMatch) document.getElementById('newDocCap').value = parseFloat(capMatch[1].replace(/,/g, ''));
+
+      this.pendingLetterFile = file;
+      this.showToast('公文智慧解析完成，請確認各欄位後點擊儲存！', 'success');
+    } catch(err) {
+      console.warn('PDF parse error:', err);
+      this.showToast('公文文字解析失敗，請手動填寫欄位', 'warning');
+    } finally {
+      this.showLoading(false);
+    }
+  }
+
+  // 14. 儲存新函文至資料庫
+  async saveNewCadastreLetter() {
+    const docNo = document.getElementById('newDocNo')?.value?.trim();
+    const docDate = document.getElementById('newDocDate')?.value?.trim();
+    const fullLand = document.getElementById('newDocLand')?.value?.trim();
+    const feeder = document.getElementById('newDocFeeder')?.value?.trim();
+    const sub = document.getElementById('newDocSub')?.value?.trim();
+    const cap = parseFloat(document.getElementById('newDocCap')?.value) || 0;
+
+    if (!docNo || !fullLand) {
+      this.showToast('請務必填寫發文字號與完整地號名稱！', 'warning');
+      return;
+    }
+
+    const id = `doc_${Date.now()}`;
+    const newDoc = {
+      id,
+      doc_number: docNo,
+      doc_date: docDate || new Date().toISOString().substring(0, 10),
+      issuer: '台灣電力股份有限公司',
+      recipient: '進金生能源服務股份有限公司',
+      subject: `有關貴公司函詢「${fullLand}」供電饋線之太陽光電發電設備可併網容量一案`,
+      full_land_title: fullLand,
+      land_no: fullLand.match(/([0-9]+(?:[-之][0-9]+)?)/)?.[1] || '1',
+      substation: sub || '轄區變電所',
+      feeder_code: feeder || '待查',
+      approved_capacity_kw: cap,
+      capacity_status: cap > 1000 ? '充裕可併' : (cap > 0 ? '受限' : '飽和'),
+      policy_type: '不保留',
+      letter_file_name: this.pendingLetterFile ? this.pendingLetterFile.name : '台電可併容量函.pdf',
+      letter_file_size: this.pendingLetterFile ? `${(this.pendingLetterFile.size / 1024).toFixed(1)} KB` : '100 KB',
+      letter_content_summary: `經台電評估確認尚有可設置 ${cap} kW 之併網容量，採不保留機制。`,
+      created_at: new Date().toISOString()
+    };
+
+    await CadastreDocStorageDB.saveLetter(newDoc, this.pendingLetterFile);
+    await this.loadCadastreLetters();
+    this.closeAddCadastreModal();
+    this.pendingLetterFile = null;
+    this.showToast('已成功新增並同步至地籍函文資料庫！', 'success');
   }
 
   // 渲染共同升壓站列表

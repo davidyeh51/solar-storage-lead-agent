@@ -411,6 +411,92 @@ class SupabaseManager {
       return null;
     }
   }
+
+  // ==========================================
+  // 📑 地籍圖、地號與台電函文管理 (cadastre_letters)
+  // ==========================================
+
+  // 9. 讀取所有地籍函文紀錄
+  async getCadastreLetters() {
+    if (!this.client) this.init();
+    if (!this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('cadastre_letters')
+        .select('*')
+        .order('doc_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn('[Supabase] getCadastreLetters error:', e);
+      return null;
+    }
+  }
+
+  // 10. 新增或更新地籍函文紀錄
+  async upsertCadastreLetter(doc) {
+    if (!this.client) this.init();
+    if (!this.client || !doc) return false;
+    try {
+      const record = {
+        id: doc.id || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        doc_number: doc.doc_number || '未編號函文',
+        doc_date: doc.doc_date || new Date().toISOString().substring(0, 10),
+        issuer: doc.issuer || '台灣電力公司',
+        recipient: doc.recipient || '進金生能源服務股份有限公司',
+        subject: doc.subject || '',
+        county_code: doc.county_code || 'Q',
+        county_name: doc.county_name || '嘉義縣',
+        town_code: doc.town_code || '',
+        town_name: doc.town_name || '',
+        section_code: doc.section_code || '',
+        section_name: doc.section_name || '',
+        land_no: doc.land_no || '',
+        full_land_title: doc.full_land_title || '',
+        office_name: doc.office_name || '',
+        substation: doc.substation || '',
+        feeder_code: doc.feeder_code || '',
+        approved_capacity_kw: Number(doc.approved_capacity_kw) || 0,
+        capacity_status: doc.capacity_status || '充裕可併',
+        policy_type: doc.policy_type || '不保留',
+        contact_person: doc.contact_person || '',
+        contact_email: doc.contact_email || '',
+        cadastral_map_url: doc.cadastral_map_url || '',
+        letter_file_name: doc.letter_file_name || '',
+        letter_file_size: doc.letter_file_size || '',
+        letter_file_url: doc.letter_file_url || '',
+        letter_content_summary: doc.letter_content_summary || '',
+        longitude: doc.longitude ? Number(doc.longitude) : null,
+        latitude: doc.latitude ? Number(doc.latitude) : null,
+        updated_at: new Date().toISOString()
+      };
+      const { error } = await this.client
+        .from('cadastre_letters')
+        .upsert(record, { onConflict: 'id' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] upsertCadastreLetter error:', e);
+      return false;
+    }
+  }
+
+  // 11. 刪除地籍函文紀錄
+  async deleteCadastreLetter(id) {
+    if (!this.client) this.init();
+    if (!this.client || !id) return false;
+    try {
+      const { error } = await this.client
+        .from('cadastre_letters')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('[Supabase] deleteCadastreLetter error:', e);
+      return false;
+    }
+  }
 }
 
 // 註冊全域單例

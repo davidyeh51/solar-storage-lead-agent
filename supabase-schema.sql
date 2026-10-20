@@ -278,3 +278,80 @@ ON CONFLICT (uuid) DO NOTHING;
 INSERT INTO public.system_sync_logs (sync_type, source_date, feeders_count, substations_count, status, message)
 VALUES ('full_sync', '2026-09-25', 4, 3, 'SUCCESS', '初始化台電配電級再生能源可併容量與升壓站同步完成');
 
+-- ==============================================================================
+-- 8. 地籍圖、地號與台電函文管理資料庫 (cadastre_letters)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.cadastre_letters (
+    id TEXT PRIMARY KEY,
+    doc_number TEXT NOT NULL,                     -- 台電發文字號 (如: 嘉義字第1151265015號)
+    doc_date TEXT NOT NULL,                       -- 發文日期 (如: 115年10月16日)
+    issuer TEXT DEFAULT '台灣電力股份有限公司嘉義區營業處', -- 發文單位
+    recipient TEXT DEFAULT '進金生能源服務股份有限公司',  -- 受文者
+    subject TEXT NOT NULL,                        -- 主旨
+    county_code TEXT DEFAULT 'Q',                 -- 縣市代碼
+    county_name TEXT DEFAULT '嘉義縣',            -- 縣市名稱
+    town_code TEXT DEFAULT 'Q04',                 -- 鄉鎮代碼
+    town_name TEXT DEFAULT '大林鎮',              -- 鄉鎮名稱
+    section_code TEXT DEFAULT '0630',             -- 地段代碼
+    section_name TEXT DEFAULT '大工二段',          -- 地段名稱
+    land_no TEXT NOT NULL,                        -- 地號 (如: 2)
+    full_land_title TEXT NOT NULL,                -- 完整地號 (如: 嘉義縣大林鎮大工二段2地號)
+    office_name TEXT DEFAULT '大林地政事務所',      -- 轄區地政所
+    substation TEXT NOT NULL,                     -- 供電變電所 (如: 三和變電所)
+    feeder_code TEXT NOT NULL,                    -- 供電饋線代號 (如: JG74)
+    approved_capacity_kw NUMERIC DEFAULT 0,       -- 評估/核定可併容量 kW (如: 2884)
+    capacity_status TEXT DEFAULT '充裕可併',      -- 狀態 (🟢 充裕可併 / 🟡 受限 / 🔴 飽和)
+    policy_type TEXT DEFAULT '不保留',            -- 容量保留機制 (不保留/保留)
+    contact_person TEXT,                          -- 承辦聯絡人與電話 (如: 王瓏勳 05-2226711#2236)
+    contact_email TEXT,                           -- 承辦人電子信箱
+    cadastral_map_url TEXT,                       -- 地籍圖 (影像路徑或 URL)
+    letter_file_name TEXT,                        -- 原始函文檔名
+    letter_file_size TEXT,                        -- 檔案大小
+    letter_file_url TEXT,                         -- 雲端 PDF 下載/預覽連結
+    letter_content_summary TEXT,                  -- 公文重點說明摘要
+    longitude NUMERIC,                            -- 經度
+    latitude NUMERIC,                             -- 緯度
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 建立索引以優化查詢
+CREATE INDEX IF NOT EXISTS idx_cadastre_letters_doc_no ON public.cadastre_letters (doc_number);
+CREATE INDEX IF NOT EXISTS idx_cadastre_letters_land ON public.cadastre_letters (county_code, town_code, section_code, land_no);
+CREATE INDEX IF NOT EXISTS idx_cadastre_letters_feeder ON public.cadastre_letters (feeder_code);
+
+-- 啟用 RLS
+ALTER TABLE public.cadastre_letters ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read cadastre_letters" ON public.cadastre_letters;
+CREATE POLICY "Allow anon read cadastre_letters" ON public.cadastre_letters FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon write cadastre_letters" ON public.cadastre_letters;
+CREATE POLICY "Allow anon write cadastre_letters" ON public.cadastre_letters FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 插入指標示範案場 (嘉義縣大林鎮大工二段2地號 - 台電可併容量公文)
+INSERT INTO public.cadastre_letters (
+    id, doc_number, doc_date, issuer, recipient, subject,
+    county_code, county_name, town_code, town_name, section_code, section_name, land_no, full_land_title, office_name,
+    substation, feeder_code, approved_capacity_kw, capacity_status, policy_type,
+    contact_person, contact_email, cadastral_map_url, letter_file_name, letter_file_size, letter_file_url,
+    letter_content_summary, longitude, latitude
+) VALUES (
+    'doc_1151265015',
+    '嘉義字第1151265015號',
+    '115年10月16日',
+    '台灣電力股份有限公司嘉義區營業處',
+    '進金生能源服務股份有限公司',
+    '有關貴公司函詢「嘉義縣大林鎮大工二段2地號」供電饋線之太陽光電發電設備可併網容量一案，復如說明，請查照。',
+    'Q', '嘉義縣', 'Q04', '大林鎮', '0630', '大工二段', '2', '嘉義縣大林鎮大工二段2地號', '大林地政事務所',
+    '三和變電所', 'JG74', 2884, '充裕可併', '不保留',
+    '王瓏勳 (05-2226711#2236)', 'u439531@taipower.com.tw',
+    './docs/cadastre_dalin_0630_2.png',
+    '有關貴公司函詢「嘉義縣大林鎮大工二段2地號」供電饋 線之太陽光電發電設備可併網容量一案，復如說明，請查 照.pdf',
+    '258.3 KB',
+    './docs/嘉義縣大林鎮大工二段2地號_台電可併容量函_1151265015.pdf',
+    '1. 建案地點位於嘉義區處轄管三和變電所JG74饋線供電範圍，確認目前尚有可設置2,884 kW之併網容量。2. 採不保留機制，請妥適規劃併網審查時點。3. 若後續送審容量不足，可辦理建照圖面免設/減設變更，或採自發自用不躉售+防逆流電驛。',
+    120.52105, 23.59335
+) ON CONFLICT (id) DO UPDATE SET
+    approved_capacity_kw = EXCLUDED.approved_capacity_kw,
+    letter_content_summary = EXCLUDED.letter_content_summary,
+    updated_at = NOW();
+

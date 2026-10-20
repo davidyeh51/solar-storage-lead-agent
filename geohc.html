@@ -114,9 +114,31 @@
         class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition active:scale-95"
       >
         <i data-lucide="table" class="w-3.5 h-3.5 text-cyan-200"></i>
-        <span>電費單案場帳冊 (Sheet)</span>
+        <span>電費單案場帳冊</span>
         <span id="headerSheetBadge" class="ml-1 px-1.5 py-0.2 rounded-full bg-blue-800 text-white font-mono text-[10px]">0</span>
       </button>
+
+      <!-- 📑 地籍與台電函文庫按鈕 -->
+      <button 
+        onclick="window.geoHCApp.openCadastreModal()" 
+        class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md transition active:scale-95"
+        title="開啟地籍圖、地號與台電可併容量函文管理彈窗"
+      >
+        <i data-lucide="folder-check" class="w-3.5 h-3.5 text-teal-200"></i>
+        <span>地籍與台電函文庫</span>
+        <span id="headerCadastreBadge" class="ml-1 px-1.5 py-0.2 rounded-full bg-teal-800 text-white font-mono text-[10px]">1</span>
+      </button>
+
+      <!-- 🗄️ 專屬公文資料庫頁面連結 -->
+      <a 
+        href="cadastre-letters.html" 
+        target="_blank"
+        class="inline-flex items-center space-x-1 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/20 transition"
+        title="在新分頁開啟專屬地籍與公文資料庫全螢幕頁面"
+      >
+        <i data-lucide="database" class="w-3.5 h-3.5 text-cyan-300"></i>
+        <span>公文資料庫 ↗</span>
+      </a>
 
       <!-- 返回業務戰情室 -->
       <a 
@@ -280,6 +302,9 @@
           <div class="pt-0.5">
             <span class="text-[10px] text-slate-400 block mb-1.5 font-medium">常見指標示範地號快速點選：</span>
             <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="window.geoHCApp.loadSampleLand('dalin')" class="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-[11px] font-mono text-amber-900 font-bold border border-amber-300 flex items-center gap-1 shadow-2xs">
+                ⭐ 嘉義大林大工二段 2 (台電函覆 2.88MW)
+              </button>
               <button type="button" onclick="window.geoHCApp.loadSampleLand('qigu')" class="px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-[11px] font-mono text-[#005A9C] font-bold">
                 台南七股區大寮段 500
               </button>
@@ -714,6 +739,8 @@
         </button>
       </div>
     </div>
+  </div>
+
   <!-- MODAL: 電費單案場帳冊清冊 (Bill Records Sheet) -->
   <div id="billSheetModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white border border-[#CBD5E1] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp">
@@ -822,6 +849,205 @@
       <div class="p-3 border-t border-slate-200 flex justify-end bg-slate-50 rounded-b-2xl">
         <button onclick="window.geoHCApp.closeSheetModal()" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition">
           關閉帳冊視窗
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: 地籍圖、地號與台電函文管理資料庫 (Cadastre & Taipower Letter DB) -->
+  <div id="cadastreLettersModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-[#CBD5E1] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp">
+      <!-- 標題欄 -->
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-[#005A9C] text-white flex items-center justify-center shadow-md">
+            <i data-lucide="folder-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-[#051C2C]">地籍圖 ✕ 地號 ✕ 台電函文綜合管理庫</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-teal-100 text-teal-800 font-bold font-mono">NLSC OpenData ✕ Supabase</span>
+            </div>
+            <p class="text-xs text-slate-500">列管各案場「地號」、「NLSC開放地籍圖」與「台電可併網容量函文」，支援雙軌持久化保存與即時 GIS 定位</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <!-- 前往獨立管理頁面 -->
+          <a 
+            href="cadastre-letters.html" 
+            target="_blank"
+            class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-[#005A9C] font-bold text-xs border border-slate-300 shadow-xs transition active:scale-95 flex items-center gap-1.5"
+            title="於新分頁開啟專屬地籍函文資料庫獨立全功能頁面"
+          >
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+            <span>獨立資料庫頁面 ↗</span>
+          </a>
+
+          <!-- 匯出 CSV 按鈕 -->
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.exportCadastreCSV()" 
+            class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+          >
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>匯出 Excel / CSV</span>
+          </button>
+
+          <!-- 上傳新公文按鈕 -->
+          <button 
+            type="button" 
+            onclick="window.geoHCApp.openAddCadastreModal()" 
+            class="px-3.5 py-2 rounded-xl bg-[#005A9C] hover:bg-[#004780] text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+          >
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+            <span>上傳台電函文</span>
+          </button>
+
+          <!-- 關閉 -->
+          <button onclick="window.geoHCApp.closeCadastreModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 核心 KPI 摘要卡片 -->
+      <div class="p-4 bg-white border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div class="p-3 rounded-xl bg-teal-50/60 border border-teal-100">
+          <span class="text-[10px] text-slate-500 block font-medium">總列管地籍公文數</span>
+          <span id="cadastreKpiTotal" class="text-lg font-bold font-mono text-teal-800">1 份</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <span class="text-[10px] text-slate-500 block font-medium">核定可併容量合計</span>
+          <span id="cadastreKpiKw" class="text-lg font-bold font-mono text-[#005A9C]">2,884 kW</span>
+        </div>
+        <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
+          <span class="text-[10px] text-emerald-700 block font-medium">充裕可併案場 (≥1MW)</span>
+          <span id="cadastreKpiGreen" class="text-lg font-bold font-mono text-emerald-600">1 案</span>
+        </div>
+        <div class="p-3 rounded-xl bg-blue-50/60 border border-blue-100">
+          <span class="text-[10px] text-blue-700 block font-medium">資料庫雙軌儲存狀態</span>
+          <span class="text-xs font-bold text-[#005A9C] mt-1 block flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Supabase ✕ IndexedDB
+          </span>
+        </div>
+      </div>
+
+      <!-- 搜尋篩選與操作列 -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div class="flex-1 relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+          <input 
+            id="cadastreSearchInput" 
+            type="text" 
+            placeholder="搜尋公文字號 (如: 嘉義字第1151265015號)、地段地號 (大工二段2號)、饋線 (JG74)、變電所..." 
+            oninput="window.geoHCApp.filterCadastreTable()" 
+            class="w-full pl-9 pr-4 py-1.5 rounded-xl bg-white border border-slate-300 text-xs focus:outline-none focus:border-[#005A9C]"
+          >
+        </div>
+        <span class="text-[11px] text-slate-400">點擊「地籍圖」或「函文 PDF」即可開啟預覽視窗</span>
+      </div>
+
+      <!-- 表格本體 (McKinsey High-Density Table) -->
+      <div class="overflow-x-auto overflow-y-auto flex-1 p-0">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100/80 text-[11px] font-bold text-slate-600 border-b border-slate-200 uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
+              <th class="px-3 py-2.5 text-center w-12">#</th>
+              <th class="px-3 py-2.5">發文日期</th>
+              <th class="px-3 py-2.5">台電發文字號 / 發文單位</th>
+              <th class="px-3 py-2.5">土地完整標示 (地段與地號)</th>
+              <th class="px-3 py-2.5">供電饋線 / 變電所</th>
+              <th class="px-3 py-2.5 text-right">可併容量 (kW)</th>
+              <th class="px-3 py-2.5 text-center">評估燈號</th>
+              <th class="px-3 py-2.5 text-center">地籍圖</th>
+              <th class="px-3 py-2.5 text-center">台電函文</th>
+              <th class="px-3 py-2.5 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody id="cadastreTableBody" class="divide-y divide-slate-100 bg-white">
+            <!-- 動態注入函文列表 -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 底部關閉按鈕 -->
+      <div class="p-3 border-t border-slate-200 flex justify-between items-center bg-slate-50 rounded-b-2xl">
+        <span class="text-xs text-slate-500">※ 地籍圖圖資介接自中華民國<b>內政部國土測繪圖資服務雲 (NLSC)</b> 開放 API (WMTS)</span>
+        <button onclick="window.geoHCApp.closeCadastreModal()" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition">
+          關閉公文庫
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: 新增/上傳台電公文 (Add Cadastre Letter Modal) -->
+  <div id="addCadastreModal" class="hidden fixed inset-0 z-55 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-[#CBD5E1] rounded-2xl max-w-xl w-full flex flex-col shadow-2xl animate-scaleUp">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-[#005A9C] text-white flex items-center justify-center">
+            <i data-lucide="file-plus" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-[#051C2C] text-sm">上傳或登錄台電可併容量函文</h4>
+            <p class="text-[11px] text-slate-400">支援 PDF 智慧萃取字號、地號、饋線與核定容量</p>
+          </div>
+        </div>
+        <button onclick="window.geoHCApp.closeAddCadastreModal()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <!-- 檔案上傳拖曳區 -->
+        <div class="border-2 border-dashed border-slate-300 hover:border-[#005A9C] rounded-xl p-4 text-center cursor-pointer bg-slate-50 transition" onclick="document.getElementById('letterFileInput').click()">
+          <input type="file" id="letterFileInput" class="hidden" accept=".pdf,image/*" onchange="window.geoHCApp.handleLetterPdfUpload(this.files[0])">
+          <i data-lucide="file-up" class="w-8 h-8 mx-auto text-[#005A9C] mb-1.5"></i>
+          <p class="font-bold text-slate-700">點擊或拖曳台電公文 PDF / 照片檔案至此</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">系統將自動啟動 OCR 與智慧正則解析各欄位</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">台電發文字號 *</label>
+            <input id="newDocNo" type="text" placeholder="例: 嘉義字第1151265015號" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C]">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">發文日期</label>
+            <input id="newDocDate" type="text" placeholder="例: 115年10月16日" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C]">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">完整土地地號標示 *</label>
+          <input id="newDocLand" type="text" placeholder="例: 嘉義縣大林鎮大工二段2地號" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C]">
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">供電饋線代號</label>
+            <input id="newDocFeeder" type="text" placeholder="例: JG74" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C] font-mono uppercase">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">轄區變電所</label>
+            <input id="newDocSub" type="text" placeholder="例: 三和變電所" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C]">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">核定容量 (kW)</label>
+            <input id="newDocCap" type="number" placeholder="例: 2884" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#005A9C] font-mono">
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 flex justify-end space-x-2 bg-slate-50 rounded-b-2xl">
+        <button onclick="window.geoHCApp.closeAddCadastreModal()" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold transition">
+          取消
+        </button>
+        <button onclick="window.geoHCApp.saveNewCadastreLetter()" class="px-4 py-2 rounded-xl bg-[#005A9C] hover:bg-[#004780] text-white font-bold transition flex items-center gap-1.5">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>儲存並同步至資料庫</span>
         </button>
       </div>
     </div>
